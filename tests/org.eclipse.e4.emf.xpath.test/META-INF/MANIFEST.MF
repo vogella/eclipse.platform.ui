@@ -5,7 +5,7 @@ Bundle-SymbolicName: org.eclipse.e4.emf.xpath.test;singleton:=true
 Bundle-Version: 0.4.0.qualifier
 Bundle-Vendor: %providerName
 Bundle-Localization: plugin
-Bundle-RequiredExecutionEnvironment: JavaSE-17
+Bundle-RequiredExecutionEnvironment: JavaSE-21
 Export-Package: org.eclipse.e4.emf.xpath.test.model.xpathtest,
  org.eclipse.e4.emf.xpath.test.model.xpathtest.impl,
  org.eclipse.e4.emf.xpath.test.model.xpathtest.util

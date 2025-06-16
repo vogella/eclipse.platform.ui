@@ -7,5 +7,5 @@ Eclipse-BundleShape: dir
 Bundle-Vendor: Eclipse.org
 Fragment-Host: org.eclipse.ui.ide.application
 Require-Bundle: org.junit
-Bundle-RequiredExecutionEnvironment: JavaSE-17
+Bundle-RequiredExecutionEnvironment: JavaSE-21
 Automatic-Module-Name: org.eclipse.ui.ide.application.tests
