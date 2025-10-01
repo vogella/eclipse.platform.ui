@@ -15,6 +15,7 @@
  *******************************************************************************/
 package org.eclipse.ui.tests.services;
 
+import org.junit.platform.suite.api.SelectClasses;
 import org.junit.platform.suite.api.Suite;
 
 /**

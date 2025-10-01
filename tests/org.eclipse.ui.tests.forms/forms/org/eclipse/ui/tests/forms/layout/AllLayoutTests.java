@@ -18,6 +18,7 @@ package org.eclipse.ui.tests.forms.layout;
 import org.eclipse.ui.tests.forms.widgets.HintAdjustmentTest;
 import org.eclipse.ui.tests.forms.widgets.SizeCacheTest;
 
+import org.junit.platform.suite.api.SelectClasses;
 import org.junit.platform.suite.api.Suite;
 
 /**

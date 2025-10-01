@@ -26,6 +26,7 @@ import org.eclipse.ui.tests.ide.api.FileEditorInputTest;
 import org.eclipse.ui.tests.ide.api.IDETest;
 import org.eclipse.ui.tests.ide.api.IDETest2;
 
+import org.junit.platform.suite.api.SelectClasses;
 import org.junit.platform.suite.api.Suite;
 
 @Suite

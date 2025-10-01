@@ -16,6 +16,7 @@ package org.eclipse.jface.tests.images;
 
 import org.junit.runner.JUnitCore;
 
+import org.junit.platform.suite.api.SelectClasses;
 import org.junit.platform.suite.api.Suite;
 
 @Suite

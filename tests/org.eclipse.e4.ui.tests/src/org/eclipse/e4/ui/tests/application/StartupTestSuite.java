@@ -15,6 +15,7 @@
 
 package org.eclipse.e4.ui.tests.application;
 
+import org.junit.platform.suite.api.SelectClasses;
 import org.junit.platform.suite.api.Suite;
 
 @Suite

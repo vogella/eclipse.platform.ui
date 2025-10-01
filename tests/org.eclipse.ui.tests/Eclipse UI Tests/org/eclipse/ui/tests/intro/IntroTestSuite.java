@@ -13,6 +13,7 @@
  *******************************************************************************/
 package org.eclipse.ui.tests.intro;
 
+import org.junit.platform.suite.api.SelectClasses;
 import org.junit.platform.suite.api.Suite;
 
 /**

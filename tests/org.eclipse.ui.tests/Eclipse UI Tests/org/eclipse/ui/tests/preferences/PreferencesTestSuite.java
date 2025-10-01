@@ -16,6 +16,7 @@ package org.eclipse.ui.tests.preferences;
 
 import org.eclipse.ui.tests.propertyPages.PropertyPageEnablementTest;
 
+import org.junit.platform.suite.api.SelectClasses;
 import org.junit.platform.suite.api.Suite;
 
 /**

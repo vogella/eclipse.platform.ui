@@ -21,6 +21,7 @@ import org.eclipse.ui.tests.forms.layout.AllLayoutTests;
 import org.eclipse.ui.tests.forms.util.AllUtilityTests;
 import org.eclipse.ui.tests.forms.widgets.AllWidgetsTests;
 
+import org.junit.platform.suite.api.SelectClasses;
 import org.junit.platform.suite.api.Suite;
 
 /**

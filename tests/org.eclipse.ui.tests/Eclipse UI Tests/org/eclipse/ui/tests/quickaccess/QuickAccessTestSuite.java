@@ -13,6 +13,7 @@
  *******************************************************************************/
 package org.eclipse.ui.tests.quickaccess;
 
+import org.junit.platform.suite.api.SelectClasses;
 import org.junit.platform.suite.api.Suite;
 
 @Suite

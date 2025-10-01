@@ -15,6 +15,7 @@ package org.eclipse.ui.tests.dialogs;
 
 import org.eclipse.ui.tests.compare.UIComparePreferences;
 
+import org.junit.platform.suite.api.SelectClasses;
 import org.junit.platform.suite.api.Suite;
 
 /**
