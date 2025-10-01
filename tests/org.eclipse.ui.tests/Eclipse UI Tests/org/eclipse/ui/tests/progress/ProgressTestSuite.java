@@ -15,8 +15,7 @@
 
 package org.eclipse.ui.tests.progress;
 
-import org.junit.runner.RunWith;
-import org.junit.runners.Suite;
+import org.junit.platform.suite.api.Suite;
 
 /**
  * Test suite for the Progress View and related API
@@ -24,8 +23,8 @@ import org.junit.runners.Suite;
  * @since 3.6
  * @author Prakash G.R. (grprakash@in.ibm.com)
  */
-@RunWith(Suite.class)
-@Suite.SuiteClasses({
+@Suite
+@SelectClasses({
 	ProgressContantsTest.class,
 	ProgressViewTests.class,
 	JobInfoTest.class,

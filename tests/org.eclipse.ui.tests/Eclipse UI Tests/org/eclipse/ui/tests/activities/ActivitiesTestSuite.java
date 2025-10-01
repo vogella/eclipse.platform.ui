@@ -14,14 +14,13 @@
  *******************************************************************************/
 package org.eclipse.ui.tests.activities;
 
-import org.junit.runner.RunWith;
-import org.junit.runners.Suite;
+import org.junit.platform.suite.api.Suite;
 
 /**
  * The ActivitiesTestSuite class runs the activities' test suites.
  */
-@RunWith(Suite.class)
-@Suite.SuiteClasses({
+@Suite
+@SelectClasses({
 	ImagesTest.class,
 	UtilTest.class,
 	StaticTest.class,

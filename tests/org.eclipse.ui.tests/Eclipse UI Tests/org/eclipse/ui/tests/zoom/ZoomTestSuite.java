@@ -13,14 +13,13 @@
  *******************************************************************************/
 package org.eclipse.ui.tests.zoom;
 
-import org.junit.runner.RunWith;
-import org.junit.runners.Suite;
+import org.junit.platform.suite.api.Suite;
 
 /**
  * A test suite to test the zooming behavior of Eclipse.
  */
-@RunWith(Suite.class)
-@Suite.SuiteClasses({ //
+@Suite
+@SelectClasses({ //
 		ZoomedViewActivateTest.class, //
 		ZoomedEditorCloseTest.class, //
 		ZoomedViewCloseTest.class, //

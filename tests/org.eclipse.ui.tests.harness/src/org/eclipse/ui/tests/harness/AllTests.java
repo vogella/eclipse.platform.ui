@@ -14,9 +14,9 @@
 package org.eclipse.ui.tests.harness;
 
 import org.eclipse.ui.tests.harness.tests.MocksTest;
-import org.junit.runner.RunWith;
-import org.junit.runners.Suite;
-import org.junit.runners.Suite.SuiteClasses;
+
+import org.junit.platform.suite.api.Suite;
+import org.junit.platform.suite.api.SelectClasses;
 
 /**
  * Test the test harness
@@ -24,9 +24,8 @@ import org.junit.runners.Suite.SuiteClasses;
  * @since 3.3
  */
 
-@RunWith(Suite.class)
+@Suite
 @SuiteClasses(MocksTest.class)
 public class AllTests {
-
 
 }

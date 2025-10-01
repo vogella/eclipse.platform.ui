@@ -3,6 +3,8 @@ Bundle-ManifestVersion: 2
 Bundle-Name: Harness Plug-in
 Bundle-SymbolicName: org.eclipse.ui.tests.harness;singleton:=true
 Bundle-Version: 1.10.600.qualifier
+Import-Package: org.junit.jupiter.api,
+ org.junit.platform.suite.api
 Eclipse-BundleShape: dir
 Require-Bundle: org.eclipse.ui,
  org.eclipse.core.runtime,

@@ -14,11 +14,10 @@
  *******************************************************************************/
 package org.eclipse.ui.tests.browser.internal;
 
-import org.junit.runner.RunWith;
-import org.junit.runners.Suite;
+import org.junit.platform.suite.api.Suite;
 
-@RunWith(Suite.class)
-@Suite.SuiteClasses({
+@Suite
+@SelectClasses({
 		ExistenceTestCase.class, InternalBrowserViewTestCase.class, InternalBrowserEditorTestCase.class,
 		// ExternalBrowserTestCase.class);
 		DialogsTestCase.class, PreferencesTestCase.class, TestInput.class, ToolbarBrowserTestCase.class,

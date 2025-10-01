@@ -13,8 +13,7 @@
  *******************************************************************************/
 package org.eclipse.ui.tests.contexts;
 
-import org.junit.runner.RunWith;
-import org.junit.runners.Suite;
+import org.junit.platform.suite.api.Suite;
 
 /**
  * The suite of tests related to the "org.eclipse.ui.contexts" extension point,
@@ -24,8 +23,8 @@ import org.junit.runners.Suite;
  *
  * @since 3.0
  */
-@RunWith(Suite.class)
-@Suite.SuiteClasses({
+@Suite
+@SelectClasses({
 	Bug74990Test.class,
 	Bug84763Test.class,
 	ExtensionTestCase.class,

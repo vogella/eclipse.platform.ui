@@ -16,11 +16,10 @@
  *******************************************************************************/
 package org.eclipse.ui.tests.datatransfer;
 
-import org.junit.runner.RunWith;
-import org.junit.runners.Suite;
+import org.junit.platform.suite.api.Suite;
 
-@RunWith(Suite.class)
-@Suite.SuiteClasses({
+@Suite
+@SelectClasses({
 	ImportOperationTest.class,
 	ImportArchiveOperationTest.class,
 	ExportFileSystemOperationTest.class,

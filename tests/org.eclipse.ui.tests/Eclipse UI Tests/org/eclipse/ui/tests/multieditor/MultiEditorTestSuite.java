@@ -13,11 +13,10 @@
  *******************************************************************************/
 package org.eclipse.ui.tests.multieditor;
 
-import org.junit.runner.RunWith;
-import org.junit.runners.Suite;
+import org.junit.platform.suite.api.Suite;
 
-@RunWith(Suite.class)
-@Suite.SuiteClasses({ //
+@Suite
+@SelectClasses({ //
 		AbstractMultiEditorTest.class, //
 		MultiEditorTest.class, //
 })

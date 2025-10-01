@@ -13,11 +13,10 @@
  *******************************************************************************/
 package org.eclipse.ltk.core.refactoring.tests.participants;
 
-import org.junit.runner.RunWith;
-import org.junit.runners.Suite;
+import org.junit.platform.suite.api.Suite;
 
-@RunWith(Suite.class)
-@Suite.SuiteClasses({
+@Suite
+@SelectClasses({
 	FailingParticipantTests.class,
 	SharedTextChangeTests.class,
 	CancelingParticipantTests.class,

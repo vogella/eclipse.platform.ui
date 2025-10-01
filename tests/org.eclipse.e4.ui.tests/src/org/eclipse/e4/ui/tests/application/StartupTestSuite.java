@@ -15,11 +15,10 @@
 
 package org.eclipse.e4.ui.tests.application;
 
-import org.junit.runner.RunWith;
-import org.junit.runners.Suite;
+import org.junit.platform.suite.api.Suite;
 
-@RunWith(Suite.class)
-@Suite.SuiteClasses({ EModelServiceTest.class, EModelServiceFindTest.class, EModelServicePerspectiveFindTest.class,
+@Suite
+@SelectClasses({ EModelServiceTest.class, EModelServiceFindTest.class, EModelServicePerspectiveFindTest.class,
 		EModelServiceInsertTest.class, EPartServiceTest.class, ESelectionServiceTest.class, EventBrokerTest.class,
 		HeadlessContactsDemoTest.class, HeadlessPhotoDemoTest.class, UIEventsTest.class,
 })

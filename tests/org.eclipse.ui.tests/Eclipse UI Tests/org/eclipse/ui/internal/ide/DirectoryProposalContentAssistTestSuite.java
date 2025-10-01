@@ -13,11 +13,10 @@
  *******************************************************************************/
 package org.eclipse.ui.internal.ide;
 
-import org.junit.runner.RunWith;
-import org.junit.runners.Suite;
+import org.junit.platform.suite.api.Suite;
 
-@RunWith(Suite.class)
-@Suite.SuiteClasses({ DirectoryProposalContentAssistTest.class })
+@Suite
+@SelectClasses({ DirectoryProposalContentAssistTest.class })
 public class DirectoryProposalContentAssistTestSuite {
 
 }
