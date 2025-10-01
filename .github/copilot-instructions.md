@@ -122,7 +122,7 @@ ctx.bindValue(
 
 1. Check `MANIFEST.MF` for dependencies before adding imports
 2. Don't break API compatibility - API tools will fail build
-3. Dispose ALL SWT resources (colors, fonts, images, shells)
+3. Dispose SWT resources (fonts, images, shells) - system colors don't need disposal
 4. UI code must run on Display thread (use `asyncExec`/`syncExec`)
 5. Use existing test infrastructure (JUnit 4, UI harness)
 6. Update `build.properties` when adding files/packages
