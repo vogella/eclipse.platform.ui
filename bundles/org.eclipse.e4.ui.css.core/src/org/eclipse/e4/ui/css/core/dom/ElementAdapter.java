@@ -37,11 +37,11 @@ public abstract class ElementAdapter implements Element, CSSStylableElement {
 
 	private static final String[] EMPTY_STRING = new String[0];
 
-	private Object nativeWidget;
+	private final Object nativeWidget;
 
 	protected CSSEngine engine;
 
-	private Map <String, CSSStyleDeclaration> defaultStyleDeclarationMap = new HashMap<>();
+	private final Map <String, CSSStyleDeclaration> defaultStyleDeclarationMap = new HashMap<>();
 
 	private CSSExtendedProperties style;
 
@@ -72,7 +72,7 @@ public abstract class ElementAdapter implements Element, CSSStylableElement {
 
 	@Override
 	public void copyDefaultStyleDeclarations(CSSStylableElement stylableElement) {
-		// Copy default style decalaration
+		// Copy default style declaration
 		this.setDefaultStyleDeclaration(null, stylableElement
 				.getDefaultStyleDeclaration(null));
 		// Copy all static pseudo instances

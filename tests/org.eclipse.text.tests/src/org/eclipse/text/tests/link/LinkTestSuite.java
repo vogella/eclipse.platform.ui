@@ -14,23 +14,21 @@
 
 package org.eclipse.text.tests.link;
 
-import org.junit.runner.RunWith;
-import org.junit.runners.Suite;
-import org.junit.runners.Suite.SuiteClasses;
-
+import org.junit.platform.suite.api.SelectClasses;
+import org.junit.platform.suite.api.Suite;
 
 /**
  * Test Suite org.eclipse.text.tests.link.
  *
  * @since 3.0
  */
-@RunWith(Suite.class)
-@SuiteClasses({
+@Suite
+@SelectClasses({
 		LinkedPositionGroupTest.class,
 		LinkedPositionTest.class,
 		InclusivePositionUpdaterTest.class,
 		LinkedModeModelTest.class
 })
 public class LinkTestSuite {
-	// see @SuiteClasses
+	// see @SelectClasses
 }

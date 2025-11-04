@@ -4,7 +4,7 @@ JFace Data Binding/FAQ
 
 ### Where can I ask a question?
 
-You can ask questions on the [Eclipse JFace newsgroup](http://www.eclipse.org/newsportal/thread.php?group=eclipse.platform.jface). When you post please prefix the title with "\[DataBinding\]".
+You can ask questions on the [Eclipse JFace newsgroup](https://www.eclipse.org/newsportal/thread.php?group=eclipse.platform.jface). When you post please prefix the title with "\[DataBinding\]".
 
 ### How do I report a bug?
 
@@ -23,7 +23,7 @@ The JFace Data Binding plug-ins can be found in any of the following distributio
 *   RCP Runtime/SDK
 *   Platform Runtime/SDK
 
-  
+
 Just select the desired build (e.g. stable, integration, nightly) and download one of the above distributions.
 
 The plug-ins or JAR files that you need are these:
@@ -35,32 +35,31 @@ The plug-ins or JAR files that you need are these:
 *   org.eclipse.jface.databinding (if your want SWT and JFace databinding)
 *   org.eclipse.core.databinding.beans (if you want databinding to Java beans).
 
-  
+
 The databinding framework is accessible using Maven with these dependencies:
 
+```xml
     <!-- The core databinding framework -->
     <dependency>
       <groupId>org.eclipse.platform</groupId>
       <artifactId>org.eclipse.core.databinding</artifactId>
       <version>1.9.0</version>
     </dependency>
-    
+
     <!-- If you want databinding to Java beans -->
     <dependency>
       <groupId>org.eclipse.platform</groupId>
       <artifactId>org.eclipse.core.databinding.beans</artifactId>
       <version>1.6.100</version>
     </dependency>
-    
+
     <!-- If you want JFace and SWT databinding -->
     <dependency>
       <groupId>org.eclipse.platform</groupId>
       <artifactId>org.eclipse.jface.databinding</artifactId>
       <version>1.11.100</version>
     </dependency>
-    
-
- 
+```
 
 ### What is a Realm, and do I need to care?
 
