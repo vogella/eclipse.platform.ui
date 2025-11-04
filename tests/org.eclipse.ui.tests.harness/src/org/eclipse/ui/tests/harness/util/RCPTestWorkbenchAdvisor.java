@@ -233,8 +233,8 @@ public class RCPTestWorkbenchAdvisor extends WorkbenchAdvisor {
 
 		// Pump the event loop to ensure async runnables execute before marking as started
 		// This prevents the original race condition where async variables might not be set yet
-		// Wait until the variables that should be set during startup are actually set
-		UITestUtil.processEventsUntil(() -> syncWithDisplayAccess != null && asyncWithDisplayAccess != null, 5000);
+		// Wait until the variables that should be set during startup are actually set to TRUE
+		UITestUtil.processEventsUntil(() -> Boolean.TRUE.equals(syncWithDisplayAccess) && Boolean.TRUE.equals(asyncWithDisplayAccess), 5000);
 		// Process any remaining events to allow variables that should NOT be set during startup
 		// to accidentally execute (to detect regression)
 		UITestUtil.processEvents();
