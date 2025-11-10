@@ -82,18 +82,18 @@ public class NestedResourcesTests {
 		testProjects.add(projectABB);
 
 		// Wait for NestedProjectManager to process all resource changes
-		assertTrue("NestedProjectManager did not update children for projectA",
-				DisplayHelper.waitForCondition(Display.getDefault(), TIMEOUT,
-						() -> NestedProjectManager.getInstance().getDirectChildrenProjects(projectA).length == 1));
+		assertTrue(DisplayHelper.waitForCondition(Display.getDefault(), TIMEOUT,
+						() -> NestedProjectManager.getInstance().getDirectChildrenProjects(projectA).length == 1),
+				"NestedProjectManager did not update children for projectA");
 
 		IProject[] childrenOfProjectA = NestedProjectManager.getInstance().getDirectChildrenProjects(projectA);
 		Assert.assertEquals(projectAB, childrenOfProjectA[0]);
 		Assert.assertNull(NestedProjectManager.getInstance().getMostDirectOpenContainer(projectA));
 
 		// Wait for NestedProjectManager to process projectAAA
-		assertTrue("NestedProjectManager did not update children for folderAA",
-				DisplayHelper.waitForCondition(Display.getDefault(), TIMEOUT,
-						() -> NestedProjectManager.getInstance().getDirectChildrenProjects(folderAA).length == 1));
+		assertTrue(DisplayHelper.waitForCondition(Display.getDefault(), TIMEOUT,
+						() -> NestedProjectManager.getInstance().getDirectChildrenProjects(folderAA).length == 1),
+				"NestedProjectManager did not update children for folderAA");
 
 		IProject[] childrenOfFolderAA = NestedProjectManager.getInstance().getDirectChildrenProjects(folderAA);
 		Assert.assertEquals("aaa", childrenOfFolderAA[0].getName());
@@ -101,9 +101,9 @@ public class NestedResourcesTests {
 				NestedProjectManager.getInstance().getMostDirectOpenContainer(childrenOfFolderAA[0]));
 
 		// Wait for NestedProjectManager to process both projectABA and projectABB
-		assertTrue("NestedProjectManager did not update children for projectAB",
-				DisplayHelper.waitForCondition(Display.getDefault(), TIMEOUT,
-						() -> NestedProjectManager.getInstance().getDirectChildrenProjects(projectAB).length == 2));
+		assertTrue(DisplayHelper.waitForCondition(Display.getDefault(), TIMEOUT,
+						() -> NestedProjectManager.getInstance().getDirectChildrenProjects(projectAB).length == 2),
+				"NestedProjectManager did not update children for projectAB");
 	}
 
 	@Test

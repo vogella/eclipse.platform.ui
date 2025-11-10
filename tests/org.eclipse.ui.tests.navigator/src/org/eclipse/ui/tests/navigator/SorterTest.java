@@ -75,7 +75,7 @@ public class SorterTest extends NavigatorTestBase {
 
 		// We should not get any notification because of the way that
 		// sorters are found
-		assertEquals("Status Count: " + _statusCount, 0, _statusCount);
+		assertEquals(0, _statusCount, "Status Count: " + _statusCount);
 	}
 
 	// bug 231855 [CommonNavigator] CommonViewerSorter does not support

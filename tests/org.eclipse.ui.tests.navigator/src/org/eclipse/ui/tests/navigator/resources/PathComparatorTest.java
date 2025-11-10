@@ -38,9 +38,9 @@ public class PathComparatorTest {
 
 	private static void assertLessThan(IPath p1, IPath p2) {
 		int compare = COMPARATOR.compare(p1, p2);
-		assertTrue(PathComparator.class.getName() + ".compare() returned " + compare
+		assertTrue(compare < 0, PathComparator.class.getName() + ".compare() returned " + compare
 				+ " expected less than zero for paths '" + p1 + "' and '"
-				+ p2 + "'", compare < 0);
+				+ p2 + "'");
 	}
 
 	@Test

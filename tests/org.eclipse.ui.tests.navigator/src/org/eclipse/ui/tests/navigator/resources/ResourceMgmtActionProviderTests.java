@@ -188,8 +188,8 @@ public final class ResourceMgmtActionProviderTests extends NavigatorTestBase {
 		for (String thisAction : new String[] { "org.eclipse.ui.BuildAction", "org.eclipse.ui.RefreshAction",
 				"org.eclipse.ui.OpenResourceAction", "org.eclipse.ui.CloseResourceAction",
 				"org.eclipse.ui.CloseUnrelatedProjectsAction" }) {
-			assertTrue(String.format("Unexpected menu membership for %s (%b)", thisAction, !actions[index]),
-					actions[index] == menuHasContribution(thisAction));
+			assertTrue(actions[index] == menuHasContribution(thisAction),
+					String.format("Unexpected menu membership for %s (%b)", thisAction, !actions[index]));
 			index++;
 		}
 	}
