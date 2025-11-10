@@ -53,18 +53,19 @@ public class WorkbenchContextRule implements BeforeEachCallback, AfterEachCallba
 	}
 
 	@Override
-	public void beforeEach(ExtensionContext extensionContext) throws Exception {
+	public void postProcessTestInstance(Object testInstance, ExtensionContext extensionContext) throws Exception {
 		createContext();
+		ContextInjectionFactory.inject(testInstance, this.context);
+	}
+
+	@Override
+	public void beforeEach(ExtensionContext extensionContext) throws Exception {
+		// Context already created in postProcessTestInstance
 	}
 
 	@Override
 	public void afterEach(ExtensionContext extensionContext) throws Exception {
 		dispose();
-	}
-
-	@Override
-	public void postProcessTestInstance(Object testInstance, ExtensionContext extensionContext) throws Exception {
-		ContextInjectionFactory.inject(testInstance, this.context);
 	}
 
 	protected void createContext() throws Throwable {
