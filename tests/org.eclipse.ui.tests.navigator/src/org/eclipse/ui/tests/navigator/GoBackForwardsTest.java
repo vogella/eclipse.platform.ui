@@ -15,7 +15,7 @@ package org.eclipse.ui.tests.navigator;
 
 import static org.eclipse.ui.tests.harness.util.UITestUtil.processEvents;
 import static org.eclipse.ui.tests.harness.util.UITestUtil.processEventsUntil;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.nio.file.Files;

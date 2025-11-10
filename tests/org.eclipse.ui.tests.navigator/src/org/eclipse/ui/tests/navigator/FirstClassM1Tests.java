@@ -15,7 +15,7 @@
 
 package org.eclipse.ui.tests.navigator;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import org.eclipse.swt.widgets.TreeItem;
 import org.eclipse.ui.tests.navigator.m12.model.M1Project;

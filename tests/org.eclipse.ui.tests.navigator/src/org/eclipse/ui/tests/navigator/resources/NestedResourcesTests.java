@@ -13,8 +13,8 @@
  ******************************************************************************/
 package org.eclipse.ui.tests.navigator.resources;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -33,7 +33,7 @@ import org.eclipse.ui.internal.navigator.resources.nested.NestedProjectManager;
 import org.eclipse.ui.internal.navigator.resources.nested.NestedProjectsLabelProvider;
 import org.eclipse.ui.tests.harness.util.DisplayHelper;
 import org.junit.After;
-import org.junit.Assert;
+import org.junit.jupiter.api.Assertions;
 import org.junit.Test;
 
 /**
@@ -87,8 +87,8 @@ public class NestedResourcesTests {
 				"NestedProjectManager did not update children for projectA");
 
 		IProject[] childrenOfProjectA = NestedProjectManager.getInstance().getDirectChildrenProjects(projectA);
-		Assert.assertEquals(projectAB, childrenOfProjectA[0]);
-		Assert.assertNull(NestedProjectManager.getInstance().getMostDirectOpenContainer(projectA));
+		Assertions.assertEquals(projectAB, childrenOfProjectA[0]);
+		Assertions.assertNull(NestedProjectManager.getInstance().getMostDirectOpenContainer(projectA));
 
 		// Wait for NestedProjectManager to process projectAAA
 		assertTrue(DisplayHelper.waitForCondition(Display.getDefault(), TIMEOUT,
@@ -96,8 +96,8 @@ public class NestedResourcesTests {
 				"NestedProjectManager did not update children for folderAA");
 
 		IProject[] childrenOfFolderAA = NestedProjectManager.getInstance().getDirectChildrenProjects(folderAA);
-		Assert.assertEquals("aaa", childrenOfFolderAA[0].getName());
-		Assert.assertEquals(folderAA,
+		Assertions.assertEquals("aaa", childrenOfFolderAA[0].getName());
+		Assertions.assertEquals(folderAA,
 				NestedProjectManager.getInstance().getMostDirectOpenContainer(childrenOfFolderAA[0]));
 
 		// Wait for NestedProjectManager to process both projectABA and projectABB

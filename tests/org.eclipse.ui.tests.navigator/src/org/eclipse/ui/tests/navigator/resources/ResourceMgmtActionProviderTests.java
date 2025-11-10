@@ -10,8 +10,8 @@
  *******************************************************************************/
 package org.eclipse.ui.tests.navigator.resources;
 
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import org.eclipse.core.resources.ICommand;
 import org.eclipse.core.resources.IFolder;
