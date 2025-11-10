@@ -95,79 +95,75 @@ public class GoBackForwardsTest {
 
 		openGenericEditor(editorInput);
 
-		assertTrue("Timeout during navigation." + getStateDetails(),
-				processEventsUntil(genericEditorNoSelection, 1000));
+		assertTrue(processEventsUntil(genericEditorNoSelection, 1000),
+				"Timeout during navigation." + getStateDetails());
 
 		selectInGenericEditor(editorInput);
 
-		assertTrue("Timeout during navigation." + getStateDetails(),
-				processEventsUntil(genericEditorSelection, 1000));
+		assertTrue(processEventsUntil(genericEditorSelection, 1000),
+				"Timeout during navigation." + getStateDetails());
 
 		openTextEditor(editorInput);
 
-		assertTrue("Timeout during navigation." + getStateDetails(),
-				processEventsUntil(textEditorNoSelection, 1000));
+		assertTrue(processEventsUntil(textEditorNoSelection, 1000),
+				"Timeout during navigation." + getStateDetails());
 
 		selectInTextEditor(editorInput);
 
-		assertTrue("Timeout during navigation." + getStateDetails(),
-				processEventsUntil(textEditorSelection, 1000));
+		assertTrue(processEventsUntil(textEditorSelection, 1000),
+				"Timeout during navigation." + getStateDetails());
 
 		openGenericEditor(editorInput);
 
-		assertTrue("Timeout during navigation." + getStateDetails(),
-				processEventsUntil(genericEditorSelection, 1000));
+		assertTrue(processEventsUntil(genericEditorSelection, 1000),
+				"Timeout during navigation." + getStateDetails());
 
 		openTextEditor(editorInput);
 
-		assertTrue("Timeout during navigation." + getStateDetails(),
-				processEventsUntil(textEditorSelection, 1000));
+		assertTrue(processEventsUntil(textEditorSelection, 1000),
+				"Timeout during navigation." + getStateDetails());
 
 		// Navigate backward from text editor to editor
 		goBackward(EditorTestHelper.getActiveWorkbenchWindow(), genericEditorSelection);
-		Assert.assertEquals(
-				"Failed to correctly navigate backward from text editor to java editor." + getStateDetails(),
-				GENERIC_EDITOR_ID, getActiveEditorId());
+		Assert.assertEquals(GENERIC_EDITOR_ID, getActiveEditorId(),
+				"Failed to correctly navigate backward from text editor to java editor." + getStateDetails());
 
 		// Navigate backward from java editor to text editor
 		goBackward(EditorTestHelper.getActiveWorkbenchWindow(), textEditorSelection);
-		Assert.assertEquals(
-				"Failed to correctly navigate backward from java editor to test editor." + getStateDetails(),
-				TEXT_EDITOR_ID, getActiveEditorId());
+		Assert.assertEquals(TEXT_EDITOR_ID, getActiveEditorId(),
+				"Failed to correctly navigate backward from java editor to test editor." + getStateDetails());
 
 		// Navigate backward from text editor to text editor
 		goBackward(EditorTestHelper.getActiveWorkbenchWindow(), textEditorNoSelection);
-		Assert.assertEquals(
-				"Failed to correctly navigate backward from text editor to text editor." + getStateDetails(),
-				TEXT_EDITOR_ID, getActiveEditorId());
+		Assert.assertEquals(TEXT_EDITOR_ID, getActiveEditorId(),
+				"Failed to correctly navigate backward from text editor to text editor." + getStateDetails());
 
 		// Navigate backward from java editor to java editor
 		goBackward(EditorTestHelper.getActiveWorkbenchWindow(), genericEditorSelection);
 		goBackward(EditorTestHelper.getActiveWorkbenchWindow(), genericEditorNoSelection);
-		Assert.assertEquals(
-				"Failed to correctly navigate backward from java editor to java editor." + getStateDetails(),
-				GENERIC_EDITOR_ID, getActiveEditorId());
+		Assert.assertEquals(GENERIC_EDITOR_ID, getActiveEditorId(),
+				"Failed to correctly navigate backward from java editor to java editor." + getStateDetails());
 
 		// Navigate forward from java editor to java editor
 		goForward(EditorTestHelper.getActiveWorkbenchWindow(), genericEditorSelection);
-		Assert.assertEquals("Failed to correctly navigate forward from java editor to java editor." + getStateDetails(),
-				GENERIC_EDITOR_ID, getActiveEditorId());
+		Assert.assertEquals(GENERIC_EDITOR_ID, getActiveEditorId(),
+				"Failed to correctly navigate forward from java editor to java editor." + getStateDetails());
 
 		// Navigate forward from text editor to text editor
 		goForward(EditorTestHelper.getActiveWorkbenchWindow(), textEditorNoSelection);
 		goForward(EditorTestHelper.getActiveWorkbenchWindow(), textEditorSelection);
-		Assert.assertEquals("Failed to correctly navigate forward from java editor to java editor." + getStateDetails(),
-				TEXT_EDITOR_ID, getActiveEditorId());
+		Assert.assertEquals(TEXT_EDITOR_ID, getActiveEditorId(),
+				"Failed to correctly navigate forward from java editor to java editor." + getStateDetails());
 
 		// Navigate forward from text editor to java editor
 		goForward(EditorTestHelper.getActiveWorkbenchWindow(), genericEditorSelection);
-		Assert.assertEquals("Failed to correctly navigate forward from text editor to java editor." + getStateDetails(),
-				GENERIC_EDITOR_ID, getActiveEditorId());
+		Assert.assertEquals(GENERIC_EDITOR_ID, getActiveEditorId(),
+				"Failed to correctly navigate forward from text editor to java editor." + getStateDetails());
 
 		// Navigate forward from java editor to text editor
 		goForward(EditorTestHelper.getActiveWorkbenchWindow(), textEditorSelection);
-		Assert.assertEquals("Failed to correctly navigate forward from java editor to text editor." + getStateDetails(),
-				TEXT_EDITOR_ID, getActiveEditorId());
+		Assert.assertEquals(TEXT_EDITOR_ID, getActiveEditorId(),
+				"Failed to correctly navigate forward from java editor to text editor." + getStateDetails());
 	}
 
 	private Condition currentNavigationHistoryLocationCondition(String editorId, boolean selection) {
@@ -207,13 +203,13 @@ public class GoBackForwardsTest {
 	private void goForward(IWorkbenchWindow window, Condition condition) {
 		NavigationHistoryAction action = new NavigationHistoryAction(window, true);
 		action.run();
-		assertTrue("Timeout during navigation.", processEventsUntil(condition, 1000));
+		assertTrue(processEventsUntil(condition, 1000), "Timeout during navigation.");
 	}
 
 	private void goBackward(IWorkbenchWindow window, Condition condition) {
 		NavigationHistoryAction action = new NavigationHistoryAction(window, false);
 		action.run();
-		assertTrue("Timeout during navigation.", processEventsUntil(condition, 1000));
+		assertTrue(processEventsUntil(condition, 1000), "Timeout during navigation.");
 	}
 
 	private String getActiveEditorId() {
