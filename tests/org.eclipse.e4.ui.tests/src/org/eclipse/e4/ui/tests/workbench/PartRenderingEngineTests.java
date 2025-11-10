@@ -48,6 +48,7 @@ import org.eclipse.e4.ui.model.application.ui.menu.MDirectToolItem;
 import org.eclipse.e4.ui.model.application.ui.menu.MMenu;
 import org.eclipse.e4.ui.model.application.ui.menu.MToolBar;
 import org.eclipse.e4.ui.model.application.ui.menu.MToolControl;
+import org.eclipse.e4.ui.tests.rules.ScreenshotsExtension;
 import org.eclipse.e4.ui.tests.rules.WorkbenchContextRule;
 import org.eclipse.e4.ui.workbench.IPresentationEngine;
 import org.eclipse.e4.ui.workbench.addons.cleanupaddon.CleanupAddon;
@@ -69,6 +70,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.extension.RegisterExtension;
+import org.junit.jupiter.api.extension.TestWatcher;
 import org.junit.jupiter.api.Test;
 import org.osgi.service.log.LogLevel;
 import org.osgi.service.log.LogListener;
@@ -2969,10 +2971,8 @@ public class PartRenderingEngineTests {
 		assertFalse(logged);
 	}
 
-	// TODO: Screenshots.onFailure() returns JUnit 4 TestWatcher which is incompatible with JUnit 5 @RegisterExtension
-	// Need to find JUnit 5 compatible screenshot functionality or update org.eclipse.test.Screenshots
-	// @RegisterExtension
-	// public TestWatcher screenshotRule = Screenshots.onFailure(null);
+	@RegisterExtension
+	TestWatcher screenshotExtension = ScreenshotsExtension.onFailure(null);
 
 	@Test
 	public void testBug372226() {
