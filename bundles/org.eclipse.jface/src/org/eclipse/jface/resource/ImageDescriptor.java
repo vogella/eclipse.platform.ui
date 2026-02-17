@@ -170,6 +170,26 @@ public abstract class ImageDescriptor extends DeviceResourceDescriptor<Image> {
 	}
 
 	/**
+	 * Creates an ImageDescriptor based on the given original descriptor, but with a
+	 * color matrix filter applied.
+	 *
+	 * <p>
+	 * Note that this sort of ImageDescriptor is slower and consumes more resources
+	 * than a regular image descriptor. It will also never generate results that
+	 * look as nice as a hand-drawn image.
+	 * </p>
+	 *
+	 * @param originalImage image to transform
+	 * @param matrix        the color matrix to apply
+	 * @return an ImageDescriptor that creates new images by transforming the given
+	 *         image descriptor
+	 * @since 3.24
+	 */
+	public static ImageDescriptor createWithColorMatrix(ImageDescriptor originalImage, ColorMatrix matrix) {
+		return new ColorMatrixImageDescriptor(originalImage, matrix);
+	}
+
+	/**
 	 * Creates and returns a new image descriptor for the given image. This
 	 * method takes the Device that created the Image as an argument, allowing
 	 * the original Image to be reused if the descriptor is asked for another

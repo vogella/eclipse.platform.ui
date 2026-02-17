@@ -113,8 +113,7 @@ public class CSSPropertyBackgroundSWTHandler extends AbstractCSSPropertyBackgrou
 			String pseudo, CSSEngine engine) throws Exception {
 		// Widget control = (Widget) element;
 		Widget widget = (Widget) ((WidgetElement) element).getNativeWidget();
-		Image image = (Image) engine.convert(value, Image.class,
-				widget.getDisplay());
+		Image image = (Image) engine.convert(value, Image.class, widget);
 		if (widget instanceof CTabFolder && "selected".equals(pseudo)) {
 			((CTabFolder) widget).setSelectionBackground(image);
 		} else if (widget instanceof Button button) {

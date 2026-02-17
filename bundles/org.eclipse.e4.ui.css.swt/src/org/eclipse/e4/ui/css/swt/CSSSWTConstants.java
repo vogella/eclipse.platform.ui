@@ -76,7 +76,9 @@ public class CSSSWTConstants {
 
 	public static final String BUTTON_SELECTED_LISTENER = "org.eclipse.e4.ui.css.swt.BUTTON_SELECTED_LISTENER";
 
-
-
+	/**
+	 * Constant used to store color for SVG filter into SWT widget data.
+	 */
+	public static final String CSS_SVG_FILTER_COLOR = "org.eclipse.e4.ui.css.swt.svg.filter.color";
 
 }
