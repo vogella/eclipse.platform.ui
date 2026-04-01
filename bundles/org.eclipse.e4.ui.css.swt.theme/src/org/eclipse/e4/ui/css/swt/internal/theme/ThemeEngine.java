@@ -40,7 +40,9 @@ import org.eclipse.core.runtime.IExtensionRegistry;
 import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.Platform;
 import org.eclipse.core.runtime.RegistryFactory;
+import org.eclipse.core.runtime.preferences.ConfigurationScope;
 import org.eclipse.core.runtime.preferences.IEclipsePreferences;
+import org.eclipse.core.runtime.preferences.IPreferencesService;
 import org.eclipse.core.runtime.preferences.InstanceScope;
 import org.eclipse.e4.ui.css.core.engine.CSSElementContext;
 import org.eclipse.e4.ui.css.core.engine.CSSEngine;
@@ -556,7 +558,8 @@ public class ThemeEngine implements IThemeEngine {
 	}
 
 	private String getPreferenceThemeId() {
-		return getPreferences().get(THEMEID_KEY, null);
+		IPreferencesService prefService = Platform.getPreferencesService();
+		return prefService.getString(THEME_PLUGIN_ID, THEMEID_KEY, null, null);
 	}
 
 	private IEclipsePreferences getPreferences() {
