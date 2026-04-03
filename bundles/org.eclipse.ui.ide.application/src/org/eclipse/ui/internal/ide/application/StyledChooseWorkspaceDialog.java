@@ -67,13 +67,13 @@ public class StyledChooseWorkspaceDialog extends Dialog {
 	private Composite recentPage;
 	private Composite settingsPage;
 
-	private Button launchNavButton;
-	private Button workspacesNavButton;
-	private Button recentNavButton;
-	private Button settingsNavButton;
+	private Composite launchNavItem;
+	private Composite workspacesNavItem;
+	private Composite recentNavItem;
+	private Composite settingsNavItem;
 
 	private Combo pathCombo;
-	private Button selectedNavButton;
+	private Composite selectedNavItem;
 
 	private Color darkBg;
 	private Color sidebarBg;
@@ -81,6 +81,7 @@ public class StyledChooseWorkspaceDialog extends Dialog {
 	private Color textColor;
 	private Color dimTextColor;
 	private Color linkColor;
+	private Color selectedBg;
 	private Font titleFont;
 	private Font sectionFont;
 	private final List<Image> navImages = new ArrayList<>();
@@ -138,7 +139,7 @@ public class StyledChooseWorkspaceDialog extends Dialog {
 		createSidebar(container);
 		createContentArea(container);
 
-		selectNavButton(launchNavButton, launchPage);
+		selectNavItem(launchNavItem, launchPage);
 
 		return container;
 	}
@@ -156,53 +157,83 @@ public class StyledChooseWorkspaceDialog extends Dialog {
 		Composite sidebar = new Composite(parent, SWT.NONE);
 		sidebar.setBackground(sidebarBg);
 		GridDataFactory.fillDefaults().grab(false, true).hint(SIDEBAR_WIDTH, SWT.DEFAULT).applyTo(sidebar);
-		GridLayoutFactory.fillDefaults().numColumns(1).margins(0, 10).spacing(0, 2).applyTo(sidebar);
+		GridLayoutFactory.fillDefaults().numColumns(1).margins(0, 10).spacing(0, 0).applyTo(sidebar);
 
-		launchNavButton = createNavButton(sidebar, "icons/full/obj16/styled_launch.svg", "Launch"); //$NON-NLS-1$ //$NON-NLS-2$
-		workspacesNavButton = createNavButton(sidebar, "icons/full/obj16/styled_workspaces.svg", "Workspaces"); //$NON-NLS-1$ //$NON-NLS-2$
-		recentNavButton = createNavButton(sidebar, "icons/full/obj16/styled_recent.svg", "Recent"); //$NON-NLS-1$ //$NON-NLS-2$
-		settingsNavButton = createNavButton(sidebar, "icons/full/obj16/styled_settings.svg", "Settings"); //$NON-NLS-1$ //$NON-NLS-2$
+		launchNavItem = createNavItem(sidebar, "icons/full/obj16/styled_launch.svg", "Launch"); //$NON-NLS-1$ //$NON-NLS-2$
+		workspacesNavItem = createNavItem(sidebar, "icons/full/obj16/styled_workspaces.svg", "Workspaces"); //$NON-NLS-1$ //$NON-NLS-2$
+		recentNavItem = createNavItem(sidebar, "icons/full/obj16/styled_recent.svg", "Recent"); //$NON-NLS-1$ //$NON-NLS-2$
+		settingsNavItem = createNavItem(sidebar, "icons/full/obj16/styled_settings.svg", "Settings"); //$NON-NLS-1$ //$NON-NLS-2$
 	}
 
-	private Button createNavButton(Composite parent, String iconPath, String label) {
-		Button btn = new Button(parent, SWT.FLAT | SWT.CENTER);
+	private Composite createNavItem(Composite parent, String iconPath, String label) {
+		Composite item = new Composite(parent, SWT.NONE);
+		item.setBackground(sidebarBg);
+		item.setCursor(parent.getDisplay().getSystemCursor(SWT.CURSOR_HAND));
+		GridDataFactory.fillDefaults().grab(true, false).hint(SIDEBAR_WIDTH, 58).applyTo(item);
+		GridLayoutFactory.fillDefaults().numColumns(1).margins(0, 6).spacing(0, 2).applyTo(item);
+
+		Label iconLabel = new Label(item, SWT.CENTER);
+		iconLabel.setBackground(sidebarBg);
 		Image image = loadBundleImage(iconPath);
 		if (image != null) {
-			btn.setImage(image);
+			iconLabel.setImage(image);
 		}
-		btn.setText(label);
-		btn.setBackground(sidebarBg);
-		btn.setForeground(dimTextColor);
-		GridDataFactory.fillDefaults().grab(true, false).hint(SIDEBAR_WIDTH, 60).applyTo(btn);
+		GridDataFactory.fillDefaults().align(SWT.CENTER, SWT.CENTER).grab(true, false).applyTo(iconLabel);
 
-		btn.addListener(SWT.Selection, e -> {
-			Composite page = getPageForButton(btn);
+		Label textLabel = new Label(item, SWT.CENTER);
+		textLabel.setText(label);
+		textLabel.setBackground(sidebarBg);
+		textLabel.setForeground(dimTextColor);
+		GridDataFactory.fillDefaults().align(SWT.CENTER, SWT.CENTER).grab(true, false).applyTo(textLabel);
+
+		// Click handler on all children
+		org.eclipse.swt.widgets.Listener clickHandler = e -> {
+			Composite page = getPageForItem(item);
 			if (page != null) {
-				selectNavButton(btn, page);
+				selectNavItem(item, page);
 			}
-		});
-		return btn;
+		};
+		item.addListener(SWT.MouseDown, clickHandler);
+		iconLabel.addListener(SWT.MouseDown, clickHandler);
+		textLabel.addListener(SWT.MouseDown, clickHandler);
+
+		return item;
 	}
 
-	private Composite getPageForButton(Button btn) {
-		if (btn == launchNavButton) return launchPage;
-		if (btn == workspacesNavButton) return workspacesPage;
-		if (btn == recentNavButton) return recentPage;
-		if (btn == settingsNavButton) return settingsPage;
+	private Composite getPageForItem(Composite item) {
+		if (item == launchNavItem) return launchPage;
+		if (item == workspacesNavItem) return workspacesPage;
+		if (item == recentNavItem) return recentPage;
+		if (item == settingsNavItem) return settingsPage;
 		return null;
 	}
 
-	private void selectNavButton(Button btn, Composite page) {
-		if (selectedNavButton != null) {
-			selectedNavButton.setBackground(sidebarBg);
-			selectedNavButton.setForeground(dimTextColor);
+	private void selectNavItem(Composite item, Composite page) {
+		if (selectedNavItem != null) {
+			setNavItemBackground(selectedNavItem, sidebarBg);
+			setNavItemForeground(selectedNavItem, dimTextColor);
 		}
-		selectedNavButton = btn;
-		btn.setBackground(darkBg);
-		btn.setForeground(accentColor);
+		selectedNavItem = item;
+		setNavItemBackground(item, selectedBg);
+		setNavItemForeground(item, accentColor);
 
 		stackLayout.topControl = page;
 		contentStack.layout();
+	}
+
+	private static void setNavItemBackground(Composite item, Color color) {
+		item.setBackground(color);
+		for (Control child : item.getChildren()) {
+			child.setBackground(color);
+		}
+	}
+
+	private static void setNavItemForeground(Composite item, Color color) {
+		for (Control child : item.getChildren()) {
+			if (child instanceof Label label) {
+				label.setForeground(color);
+			}
+		}
 	}
 
 	// ---- Content Area ----
@@ -288,7 +319,7 @@ public class StyledChooseWorkspaceDialog extends Dialog {
 		newWsLink.setText("<a>Create a new workspace</a>"); //$NON-NLS-1$
 		newWsLink.setForeground(linkColor);
 		newWsLink.setBackground(darkBg);
-		newWsLink.addListener(SWT.Selection, e -> selectNavButton(workspacesNavButton, workspacesPage));
+		newWsLink.addListener(SWT.Selection, e -> selectNavItem(workspacesNavItem, workspacesPage));
 
 		Label newWsDesc = new Label(leftCol, SWT.WRAP);
 		newWsDesc.setText("Browse for a folder to use as workspace."); //$NON-NLS-1$
@@ -534,6 +565,7 @@ public class StyledChooseWorkspaceDialog extends Dialog {
 	private void allocateColors(Display display) {
 		darkBg = new Color(display, 43, 43, 43);
 		sidebarBg = new Color(display, 33, 33, 33);
+		selectedBg = new Color(display, 55, 55, 55);
 		accentColor = new Color(display, 75, 175, 230);
 		textColor = new Color(display, 210, 210, 210);
 		dimTextColor = new Color(display, 140, 140, 140);
@@ -634,6 +666,9 @@ public class StyledChooseWorkspaceDialog extends Dialog {
 		}
 		if (sidebarBg != null && !sidebarBg.isDisposed()) {
 			sidebarBg.dispose();
+		}
+		if (selectedBg != null && !selectedBg.isDisposed()) {
+			selectedBg.dispose();
 		}
 		if (accentColor != null && !accentColor.isDisposed()) {
 			accentColor.dispose();
