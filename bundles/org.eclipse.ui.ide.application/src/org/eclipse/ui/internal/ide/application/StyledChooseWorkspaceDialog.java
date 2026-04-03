@@ -570,39 +570,68 @@ public class StyledChooseWorkspaceDialog extends Dialog {
 
 		addSeparator(page, 2);
 
-		Label desc = new Label(page, SWT.WRAP);
-		desc.setText("Configure workspace launcher preferences."); //$NON-NLS-1$
-		desc.setForeground(dimTextColor);
-		desc.setBackground(darkBg);
-		GridDataFactory.fillDefaults().span(2, 1).hint(400, SWT.DEFAULT).applyTo(desc);
-
-		// Placeholder setting: max recent workspaces
-		Label maxLabel = new Label(page, SWT.NONE);
-		maxLabel.setText("Max recent workspaces:"); //$NON-NLS-1$
-		maxLabel.setForeground(textColor);
-		maxLabel.setBackground(darkBg);
-
-		Label maxValue = new Label(page, SWT.NONE);
-		maxValue.setText("10"); //$NON-NLS-1$
-		maxValue.setForeground(dimTextColor);
-		maxValue.setBackground(darkBg);
-
-		// Placeholder setting: theme
+		// Theme selection (loaded asynchronously from extension registry)
 		Label themeLabel = new Label(page, SWT.NONE);
-		themeLabel.setText("Theme:"); //$NON-NLS-1$
+		themeLabel.setText("Default Theme:"); //$NON-NLS-1$
+		themeLabel.setFont(sectionFont);
 		themeLabel.setForeground(textColor);
 		themeLabel.setBackground(darkBg);
+		GridDataFactory.fillDefaults().span(2, 1).applyTo(themeLabel);
 
-		Label themeValue = new Label(page, SWT.NONE);
-		themeValue.setText("Dark (System default)"); //$NON-NLS-1$
-		themeValue.setForeground(dimTextColor);
-		themeValue.setBackground(darkBg);
+		Combo themeCombo = new Combo(page, SWT.READ_ONLY | SWT.DROP_DOWN);
+		themeCombo.setEnabled(false);
+		GridDataFactory.fillDefaults().span(2, 1).grab(true, false).hint(350, SWT.DEFAULT).applyTo(themeCombo);
 
-		// Link to switch to classic dialog
+		Label themeHint = new Label(page, SWT.WRAP);
+		themeHint.setText("Loading available themes\u2026"); //$NON-NLS-1$
+		themeHint.setForeground(dimTextColor);
+		themeHint.setBackground(darkBg);
+		GridDataFactory.fillDefaults().span(2, 1).hint(400, SWT.DEFAULT).applyTo(themeHint);
+
+		Display display = parent.getDisplay();
+		CompletableFuture.supplyAsync(StyledChooseWorkspaceDialog::loadAvailableThemes).thenAccept(themeData -> {
+			if (display.isDisposed()) {
+				return;
+			}
+			display.asyncExec(() -> {
+				if (themeCombo.isDisposed()) {
+					return;
+				}
+				List<ThemeInfo> themes = themeData.themes;
+				String currentId = themeData.currentThemeId;
+				int selectionIndex = 0;
+				for (int i = 0; i < themes.size(); i++) {
+					ThemeInfo info = themes.get(i);
+					themeCombo.add(info.label);
+					themeCombo.setData(String.valueOf(i), info.id);
+					if (info.id.equals(currentId)) {
+						selectionIndex = i;
+					}
+				}
+				if (!themes.isEmpty()) {
+					themeCombo.select(selectionIndex);
+					themeCombo.setEnabled(true);
+					themeHint.setText("Theme will be applied on next workspace launch."); //$NON-NLS-1$
+				} else {
+					themeHint.setText("No themes found in installation."); //$NON-NLS-1$
+				}
+				themeCombo.addListener(SWT.Selection, e -> {
+					int idx = themeCombo.getSelectionIndex();
+					if (idx >= 0) {
+						String selectedId = (String) themeCombo.getData(String.valueOf(idx));
+						saveThemePreference(selectedId);
+					}
+				});
+				page.layout();
+			});
+		});
+
+		// Spacer to push classic link to bottom
 		Label spacer = new Label(page, SWT.NONE);
 		spacer.setBackground(darkBg);
 		GridDataFactory.fillDefaults().span(2, 1).grab(false, true).applyTo(spacer);
 
+		// Link to switch to classic dialog
 		Link classicLink = new Link(page, SWT.NONE);
 		classicLink.setText("Don't like this startup UI? <a>Turn it off</a> and use the classic workspace prompt."); //$NON-NLS-1$
 		classicLink.setForeground(dimTextColor);
@@ -610,6 +639,79 @@ public class StyledChooseWorkspaceDialog extends Dialog {
 		GridDataFactory.fillDefaults().span(2, 1).applyTo(classicLink);
 
 		return page;
+	}
+
+	/**
+	 * Container for theme loading results.
+	 */
+	private record ThemeInfo(String id, String label) {
+	}
+
+	private record ThemeData(List<ThemeInfo> themes, String currentThemeId) {
+	}
+
+	/**
+	 * Loads available themes from the extension registry and reads the current
+	 * theme preference. Called on a background thread.
+	 */
+	private static ThemeData loadAvailableThemes() {
+		List<ThemeInfo> themes = new ArrayList<>();
+		String currentOs = org.eclipse.core.runtime.Platform.getOS();
+
+		try {
+			org.eclipse.core.runtime.IExtensionRegistry registry = org.eclipse.core.runtime.RegistryFactory
+					.getRegistry();
+			if (registry != null) {
+				var extPoint = registry.getExtensionPoint("org.eclipse.e4.ui.css.swt.theme"); //$NON-NLS-1$
+				if (extPoint != null) {
+					for (var extension : extPoint.getExtensions()) {
+						for (var element : extension.getConfigurationElements()) {
+							if ("theme".equals(element.getName())) { //$NON-NLS-1$
+								String id = element.getAttribute("id"); //$NON-NLS-1$
+								String label = element.getAttribute("label"); //$NON-NLS-1$
+								String os = element.getAttribute("os"); //$NON-NLS-1$
+								// Filter by current OS (null os = all platforms)
+								if (id != null && label != null
+										&& (os == null || os.isEmpty() || os.equals(currentOs))) {
+									themes.add(new ThemeInfo(id, label));
+								}
+							}
+						}
+					}
+				}
+			}
+		} catch (Exception e) {
+			// Registry not available — return empty
+		}
+
+		// Read current theme preference
+		String currentThemeId = null;
+		try {
+			var prefs = org.eclipse.core.runtime.preferences.InstanceScope.INSTANCE
+					.getNode("org.eclipse.e4.ui.css.swt.theme"); //$NON-NLS-1$
+			currentThemeId = prefs.get("themeid", null); //$NON-NLS-1$
+		} catch (Exception e) {
+			// Preference not available
+		}
+		if (currentThemeId == null) {
+			currentThemeId = "org.eclipse.e4.ui.css.theme.e4_default"; //$NON-NLS-1$
+		}
+
+		return new ThemeData(themes, currentThemeId);
+	}
+
+	/**
+	 * Persists the selected theme ID to the preference store.
+	 */
+	private static void saveThemePreference(String themeId) {
+		try {
+			var prefs = org.eclipse.core.runtime.preferences.InstanceScope.INSTANCE
+					.getNode("org.eclipse.e4.ui.css.swt.theme"); //$NON-NLS-1$
+			prefs.put("themeid", themeId); //$NON-NLS-1$
+			prefs.flush();
+		} catch (Exception e) {
+			// Best effort — ignore failures
+		}
 	}
 
 	// ---- Helpers ----
