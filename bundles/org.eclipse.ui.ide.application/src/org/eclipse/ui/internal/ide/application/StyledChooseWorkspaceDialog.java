@@ -370,11 +370,52 @@ public class StyledChooseWorkspaceDialog extends Dialog {
 
 		addSeparator(page, 2);
 
-		Label desc = new Label(page, SWT.WRAP);
-		desc.setText("Select or type a workspace directory to launch:"); //$NON-NLS-1$
-		desc.setForeground(textColor);
-		desc.setBackground(darkBg);
-		GridDataFactory.fillDefaults().span(2, 1).hint(500, SWT.DEFAULT).applyTo(desc);
+		// Existing workspaces list
+		List<String> recentWorkspaces = getRecentWorkspaces();
+		if (!recentWorkspaces.isEmpty()) {
+			Label existingLabel = new Label(page, SWT.NONE);
+			existingLabel.setText("Select an existing workspace:"); //$NON-NLS-1$
+			existingLabel.setFont(sectionFont);
+			existingLabel.setForeground(textColor);
+			existingLabel.setBackground(darkBg);
+			GridDataFactory.fillDefaults().span(2, 1).applyTo(existingLabel);
+
+			org.eclipse.swt.widgets.List workspaceList = new org.eclipse.swt.widgets.List(page,
+					SWT.BORDER | SWT.SINGLE | SWT.V_SCROLL);
+			GridDataFactory.fillDefaults().span(2, 1).grab(true, true).hint(SWT.DEFAULT, 150).applyTo(workspaceList);
+			for (String ws : recentWorkspaces) {
+				workspaceList.add(ws);
+			}
+			workspaceList.select(0);
+
+			// Sync list selection with combo
+			workspaceList.addListener(SWT.Selection, e -> {
+				int idx = workspaceList.getSelectionIndex();
+				if (idx >= 0) {
+					pathCombo.setText(workspaceList.getItem(idx));
+				}
+			});
+
+			// Double-click to launch directly
+			workspaceList.addListener(SWT.MouseDoubleClick, e -> {
+				int idx = workspaceList.getSelectionIndex();
+				if (idx >= 0) {
+					String workspace = workspaceList.getItem(idx);
+					launchData.workspaceSelected(TextProcessor.deprocess(workspace));
+					setReturnCode(OK);
+					close();
+				}
+			});
+
+			addSeparator(page, 2);
+		}
+
+		// New workspace section
+		Label newLabel = new Label(page, SWT.NONE);
+		newLabel.setText("Or enter a new workspace path:"); //$NON-NLS-1$
+		newLabel.setForeground(textColor);
+		newLabel.setBackground(darkBg);
+		GridDataFactory.fillDefaults().span(2, 1).applyTo(newLabel);
 
 		// Combo + Browse row
 		Composite browseRow = new Composite(page, SWT.NONE);
@@ -386,7 +427,7 @@ public class StyledChooseWorkspaceDialog extends Dialog {
 		GridDataFactory.fillDefaults().grab(true, false).hint(400, SWT.DEFAULT).applyTo(pathCombo);
 
 		// Populate combo with recent workspaces
-		for (String ws : getRecentWorkspaces()) {
+		for (String ws : recentWorkspaces) {
 			pathCombo.add(ws);
 		}
 		String initial = pathCombo.getItemCount() > 0 ? pathCombo.getItem(0) : launchData.getInitialDefault();
