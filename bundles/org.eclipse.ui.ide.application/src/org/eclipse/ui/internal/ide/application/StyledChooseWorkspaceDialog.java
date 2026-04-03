@@ -146,9 +146,9 @@ public class StyledChooseWorkspaceDialog extends Dialog {
 
 	@Override
 	protected Control createButtonBar(Composite parent) {
-		// No standard button bar — workspace launch is handled via links/buttons inside
-		// the pages
-		return new Composite(parent, SWT.NONE);
+		Composite empty = new Composite(parent, SWT.NONE);
+		GridDataFactory.fillDefaults().hint(0, 0).exclude(true).applyTo(empty);
+		return empty;
 	}
 
 	// ---- Sidebar ----
