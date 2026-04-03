@@ -74,6 +74,7 @@ import org.eclipse.ui.internal.WorkbenchPlugin;
 import org.eclipse.ui.internal.WorkspaceLock;
 import org.eclipse.ui.internal.ide.ChooseWorkspaceData;
 import org.eclipse.ui.internal.ide.ChooseWorkspaceDialog;
+import org.eclipse.ui.internal.ide.StyledChooseWorkspaceDialog;
 import org.eclipse.ui.internal.ide.IDEInternalPreferences;
 import org.eclipse.ui.internal.ide.IDEWorkbenchMessages;
 import org.eclipse.ui.internal.ide.IDEWorkbenchPlugin;
@@ -665,23 +666,27 @@ public class IDEApplication implements IApplication, IExecutableExtension {
 	 *                   of the show dialog checkbox
 	 */
 	protected void showChooseWorkspaceDialog(Shell shell, ChooseWorkspaceData launchData, boolean force) {
-		new ChooseWorkspaceDialog(shell, launchData, false, true) {
-			@Override
-			protected Shell getParentShell() {
-				// Bug 429308: Make workspace selection dialog visible
-				// in the task manager of the OS
-				return null;
-			}
-
-			@Override
-			protected Control createContents(Composite parent) {
-				Control contents = super.createContents(parent);
-				if (isDark) {
-					applyDarkStyles(getShell());
+		if (Boolean.getBoolean("eclipse.styledWorkspaceDialog")) { //$NON-NLS-1$
+			new StyledChooseWorkspaceDialog(null, launchData).prompt(force);
+		} else {
+			new ChooseWorkspaceDialog(shell, launchData, false, true) {
+				@Override
+				protected Shell getParentShell() {
+					// Bug 429308: Make workspace selection dialog visible
+					// in the task manager of the OS
+					return null;
 				}
-				return contents;
-			}
-		}.prompt(force);
+
+				@Override
+				protected Control createContents(Composite parent) {
+					Control contents = super.createContents(parent);
+					if (isDark) {
+						applyDarkStyles(getShell());
+					}
+					return contents;
+				}
+			}.prompt(force);
+		}
 	}
 
 	/**
