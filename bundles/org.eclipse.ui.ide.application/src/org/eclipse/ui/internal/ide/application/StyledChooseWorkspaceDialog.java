@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 import org.eclipse.jface.dialogs.Dialog;
 import org.eclipse.jface.layout.GridDataFactory;
@@ -333,40 +334,53 @@ public class StyledChooseWorkspaceDialog extends Dialog {
 		newWsDesc.setBackground(darkBg);
 		GridDataFactory.fillDefaults().hint(280, SWT.DEFAULT).applyTo(newWsDesc);
 
-		// -- Right: Recent Changes (read from first workspace's workbench.xml) --
+		// -- Right: Recent Changes (loaded asynchronously from all workspaces) --
 		Label changesLabel = new Label(rightCol, SWT.NONE);
 		changesLabel.setText("Recent Changes"); //$NON-NLS-1$
 		changesLabel.setFont(sectionFont);
 		changesLabel.setForeground(textColor);
 		changesLabel.setBackground(darkBg);
 
-		String sourceWorkspace = recentWorkspaces.isEmpty() ? null : recentWorkspaces.get(0);
-		Map<String, String> recentFiles = readRecentFiles(sourceWorkspace, 10);
+		Label loadingLabel = new Label(rightCol, SWT.NONE);
+		loadingLabel.setText("Loading\u2026"); //$NON-NLS-1$
+		loadingLabel.setForeground(dimTextColor);
+		loadingLabel.setBackground(darkBg);
 
-		if (recentFiles.isEmpty()) {
-			Label noFiles = new Label(rightCol, SWT.NONE);
-			noFiles.setText("No recent files found"); //$NON-NLS-1$
-			noFiles.setForeground(dimTextColor);
-			noFiles.setBackground(darkBg);
-		} else {
-			for (Map.Entry<String, String> entry : recentFiles.entrySet()) {
-				String fileName = entry.getKey();
-				String filePath = entry.getValue();
+		// Read MRU lists from all workspaces asynchronously
+		List<String> workspacePaths = new ArrayList<>(recentWorkspaces);
+		Display display = parent.getDisplay();
+		CompletableFuture.supplyAsync(() -> readRecentFilesFromWorkspaces(workspacePaths, 10))
+				.thenAccept(recentFiles -> {
+					if (display.isDisposed()) {
+						return;
+					}
+					display.asyncExec(() -> {
+						if (rightCol.isDisposed()) {
+							return;
+						}
+						loadingLabel.dispose();
+						if (recentFiles.isEmpty()) {
+							Label noFiles = new Label(rightCol, SWT.NONE);
+							noFiles.setText("No recent files found"); //$NON-NLS-1$
+							noFiles.setForeground(dimTextColor);
+							noFiles.setBackground(darkBg);
+						} else {
+							for (RecentFileEntry entry : recentFiles) {
+								Link fileLink = new Link(rightCol, SWT.NONE);
+								fileLink.setText("<a>" + entry.fileName + "</a>"); //$NON-NLS-1$ //$NON-NLS-2$
+								fileLink.setToolTipText(entry.filePath);
+								fileLink.setForeground(linkColor);
+								fileLink.setBackground(darkBg);
 
-				Link fileLink = new Link(rightCol, SWT.NONE);
-				fileLink.setText("<a>" + fileName + "</a>"); //$NON-NLS-1$ //$NON-NLS-2$
-				fileLink.setToolTipText(filePath);
-				fileLink.setForeground(linkColor);
-				fileLink.setBackground(darkBg);
-
-				// Extract project/parent folder name from tooltip path
-				String projectName = extractProjectName(filePath, sourceWorkspace);
-				Label projectLabel = new Label(rightCol, SWT.NONE);
-				projectLabel.setText("  " + projectName); //$NON-NLS-1$
-				projectLabel.setForeground(dimTextColor);
-				projectLabel.setBackground(darkBg);
-			}
-		}
+								Label projectLabel = new Label(rightCol, SWT.NONE);
+								projectLabel.setText("  " + entry.projectName); //$NON-NLS-1$
+								projectLabel.setForeground(dimTextColor);
+								projectLabel.setBackground(darkBg);
+							}
+						}
+						rightCol.layout();
+					});
+				});
 
 		return page;
 	}
@@ -677,50 +691,62 @@ public class StyledChooseWorkspaceDialog extends Dialog {
 	}
 
 	/**
-	 * Reads the MRU (most recently used) file list from a workspace's
-	 * workbench.xml metadata file.
-	 *
-	 * @param workspacePath the root path of the workspace
-	 * @param maxEntries    maximum number of entries to return
-	 * @return ordered map of file name → tooltip/path, preserving MRU order
+	 * A recent file entry with display information.
 	 */
-	private static Map<String, String> readRecentFiles(String workspacePath, int maxEntries) {
-		Map<String, String> result = new LinkedHashMap<>();
-		if (workspacePath == null || workspacePath.isBlank()) {
-			return result;
-		}
-		File workbenchXml = new File(workspacePath,
-				".metadata/.plugins/org.eclipse.ui.workbench/workbench.xml"); //$NON-NLS-1$
-		if (!workbenchXml.exists()) {
-			return result;
-		}
-		try (Reader reader = new FileReader(workbenchXml)) {
-			XMLMemento memento = XMLMemento.createReadRoot(reader);
-			IMemento mruMemento = memento.getChild("mruList"); //$NON-NLS-1$
-			if (mruMemento == null) {
-				return result;
+	private record RecentFileEntry(String fileName, String filePath, String projectName) {
+	}
+
+	/**
+	 * Reads the MRU (most recently used) file lists from multiple workspaces'
+	 * workbench.xml metadata files. Called on a background thread.
+	 *
+	 * @param workspacePaths the root paths of the workspaces to scan
+	 * @param maxEntries     maximum total number of entries to return
+	 * @return list of recent file entries, deduplicated, preserving MRU order
+	 */
+	private static List<RecentFileEntry> readRecentFilesFromWorkspaces(List<String> workspacePaths, int maxEntries) {
+		List<RecentFileEntry> result = new ArrayList<>();
+		// Track seen file names to avoid duplicates across workspaces
+		Map<String, Boolean> seen = new LinkedHashMap<>();
+		for (String workspacePath : workspacePaths) {
+			if (workspacePath == null || workspacePath.isBlank()) {
+				continue;
 			}
-			for (IMemento child : mruMemento.getChildren("file")) { //$NON-NLS-1$
-				String name = child.getString("name"); //$NON-NLS-1$
-				String tooltip = child.getString("tooltip"); //$NON-NLS-1$
-				if (name != null && !name.isEmpty()) {
-					result.put(name, tooltip != null ? tooltip : name);
-					if (result.size() >= maxEntries) {
-						break;
+			File workbenchXml = new File(workspacePath,
+					".metadata/.plugins/org.eclipse.ui.workbench/workbench.xml"); //$NON-NLS-1$
+			if (!workbenchXml.exists()) {
+				continue;
+			}
+			try (Reader reader = new FileReader(workbenchXml)) {
+				XMLMemento memento = XMLMemento.createReadRoot(reader);
+				IMemento mruMemento = memento.getChild("mruList"); //$NON-NLS-1$
+				if (mruMemento == null) {
+					continue;
+				}
+				for (IMemento child : mruMemento.getChildren("file")) { //$NON-NLS-1$
+					String name = child.getString("name"); //$NON-NLS-1$
+					String tooltip = child.getString("tooltip"); //$NON-NLS-1$
+					if (name != null && !name.isEmpty() && !seen.containsKey(name)) {
+						seen.put(name, Boolean.TRUE);
+						String filePath = tooltip != null ? tooltip : name;
+						String projectName = extractProjectName(filePath);
+						result.add(new RecentFileEntry(name, filePath, projectName));
+						if (result.size() >= maxEntries) {
+							return result;
+						}
 					}
 				}
+			} catch (Exception e) {
+				// Workspace metadata unreadable — skip to next
 			}
-		} catch (Exception e) {
-			// Workspace metadata unreadable — return empty
 		}
 		return result;
 	}
 
 	/**
-	 * Extracts a meaningful project or parent folder name from a file path
-	 * relative to the workspace.
+	 * Extracts a meaningful project or parent folder name from a file path.
 	 */
-	private static String extractProjectName(String filePath, String workspacePath) {
+	private static String extractProjectName(String filePath) {
 		if (filePath == null || filePath.isEmpty()) {
 			return ""; //$NON-NLS-1$
 		}
