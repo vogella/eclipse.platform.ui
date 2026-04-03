@@ -11,12 +11,14 @@
 package org.eclipse.ui.internal.ide.application;
 
 import java.io.File;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
 import org.eclipse.jface.dialogs.Dialog;
 import org.eclipse.jface.layout.GridDataFactory;
 import org.eclipse.jface.layout.GridLayoutFactory;
+import org.eclipse.jface.resource.ImageDescriptor;
 import org.eclipse.jface.resource.JFaceResources;
 import org.eclipse.osgi.util.TextProcessor;
 import org.eclipse.swt.SWT;
@@ -24,6 +26,7 @@ import org.eclipse.swt.custom.StackLayout;
 import org.eclipse.swt.graphics.Color;
 import org.eclipse.swt.graphics.Font;
 import org.eclipse.swt.graphics.FontData;
+import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.graphics.Point;
 import org.eclipse.swt.graphics.Rectangle;
 import org.eclipse.swt.layout.GridLayout;
@@ -38,6 +41,7 @@ import org.eclipse.swt.widgets.Link;
 import org.eclipse.swt.widgets.Monitor;
 import org.eclipse.swt.widgets.Shell;
 import org.eclipse.ui.internal.ide.ChooseWorkspaceData;
+import org.osgi.framework.FrameworkUtil;
 
 /**
  * A styled workspace selection dialog with a sidebar navigation, inspired by
@@ -79,6 +83,7 @@ public class StyledChooseWorkspaceDialog extends Dialog {
 	private Color linkColor;
 	private Font titleFont;
 	private Font sectionFont;
+	private final List<Image> navImages = new ArrayList<>();
 
 	/**
 	 * Creates the styled workspace selection dialog.
@@ -153,15 +158,19 @@ public class StyledChooseWorkspaceDialog extends Dialog {
 		GridDataFactory.fillDefaults().grab(false, true).hint(SIDEBAR_WIDTH, SWT.DEFAULT).applyTo(sidebar);
 		GridLayoutFactory.fillDefaults().numColumns(1).margins(0, 10).spacing(0, 2).applyTo(sidebar);
 
-		launchNavButton = createNavButton(sidebar, "\u2694", "Launch"); //$NON-NLS-1$ //$NON-NLS-2$
-		workspacesNavButton = createNavButton(sidebar, "\uD83D\uDCC2", "Workspaces"); //$NON-NLS-1$ //$NON-NLS-2$
-		recentNavButton = createNavButton(sidebar, "\u23F0", "Recent"); //$NON-NLS-1$ //$NON-NLS-2$
-		settingsNavButton = createNavButton(sidebar, "\u2699", "Settings"); //$NON-NLS-1$ //$NON-NLS-2$
+		launchNavButton = createNavButton(sidebar, "icons/full/obj16/styled_launch.svg", "Launch"); //$NON-NLS-1$ //$NON-NLS-2$
+		workspacesNavButton = createNavButton(sidebar, "icons/full/obj16/styled_workspaces.svg", "Workspaces"); //$NON-NLS-1$ //$NON-NLS-2$
+		recentNavButton = createNavButton(sidebar, "icons/full/obj16/styled_recent.svg", "Recent"); //$NON-NLS-1$ //$NON-NLS-2$
+		settingsNavButton = createNavButton(sidebar, "icons/full/obj16/styled_settings.svg", "Settings"); //$NON-NLS-1$ //$NON-NLS-2$
 	}
 
-	private Button createNavButton(Composite parent, String icon, String label) {
+	private Button createNavButton(Composite parent, String iconPath, String label) {
 		Button btn = new Button(parent, SWT.FLAT | SWT.CENTER);
-		btn.setText(icon + "\n" + label); //$NON-NLS-1$
+		Image image = loadBundleImage(iconPath);
+		if (image != null) {
+			btn.setImage(image);
+		}
+		btn.setText(label);
 		btn.setBackground(sidebarBg);
 		btn.setForeground(dimTextColor);
 		GridDataFactory.fillDefaults().grab(true, false).hint(SIDEBAR_WIDTH, 60).applyTo(btn);
@@ -540,6 +549,23 @@ public class StyledChooseWorkspaceDialog extends Dialog {
 		sectionFont = new Font(display, sectionFD);
 	}
 
+	private Image loadBundleImage(String path) {
+		try {
+			URL iconUrl = FrameworkUtil.getBundle(getClass()).getEntry(path);
+			if (iconUrl != null) {
+				ImageDescriptor descriptor = ImageDescriptor.createFromURL(iconUrl);
+				Image image = descriptor.createImage(false);
+				if (image != null) {
+					navImages.add(image);
+				}
+				return image;
+			}
+		} catch (Exception e) {
+			// Fall back to no image
+		}
+		return null;
+	}
+
 	private List<String> getRecentWorkspaces() {
 		String[] workspaces = launchData.getRecentWorkspaces();
 		List<String> result = new ArrayList<>();
@@ -591,6 +617,12 @@ public class StyledChooseWorkspaceDialog extends Dialog {
 
 	@Override
 	public boolean close() {
+		for (Image img : navImages) {
+			if (img != null && !img.isDisposed()) {
+				img.dispose();
+			}
+		}
+		navImages.clear();
 		if (titleFont != null && !titleFont.isDisposed()) {
 			titleFont.dispose();
 		}
