@@ -11,9 +11,13 @@
 package org.eclipse.ui.internal.ide.application;
 
 import java.io.File;
+import java.io.FileReader;
+import java.io.Reader;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.eclipse.jface.dialogs.Dialog;
 import org.eclipse.jface.layout.GridDataFactory;
@@ -40,6 +44,8 @@ import org.eclipse.swt.widgets.Label;
 import org.eclipse.swt.widgets.Link;
 import org.eclipse.swt.widgets.Monitor;
 import org.eclipse.swt.widgets.Shell;
+import org.eclipse.ui.IMemento;
+import org.eclipse.ui.XMLMemento;
 import org.eclipse.ui.internal.ide.ChooseWorkspaceData;
 import org.osgi.framework.FrameworkUtil;
 
@@ -327,30 +333,39 @@ public class StyledChooseWorkspaceDialog extends Dialog {
 		newWsDesc.setBackground(darkBg);
 		GridDataFactory.fillDefaults().hint(280, SWT.DEFAULT).applyTo(newWsDesc);
 
-		// -- Right: Recent Changes (placeholder) --
+		// -- Right: Recent Changes (read from first workspace's workbench.xml) --
 		Label changesLabel = new Label(rightCol, SWT.NONE);
 		changesLabel.setText("Recent Changes"); //$NON-NLS-1$
 		changesLabel.setFont(sectionFont);
 		changesLabel.setForeground(textColor);
 		changesLabel.setBackground(darkBg);
 
-		String[] placeholderFiles = {
-				"IDEApplication.java", //$NON-NLS-1$
-				"eclipse.product", //$NON-NLS-1$
-				"E4Application.java", //$NON-NLS-1$
-				"MANIFEST.MF", //$NON-NLS-1$
-				"DarkThemeProcessor.java" //$NON-NLS-1$
-		};
-		for (String file : placeholderFiles) {
-			Link fileLink = new Link(rightCol, SWT.NONE);
-			fileLink.setText("<a>" + file + "</a>"); //$NON-NLS-1$ //$NON-NLS-2$
-			fileLink.setForeground(linkColor);
-			fileLink.setBackground(darkBg);
+		String sourceWorkspace = recentWorkspaces.isEmpty() ? null : recentWorkspaces.get(0);
+		Map<String, String> recentFiles = readRecentFiles(sourceWorkspace, 10);
 
-			Label projectLabel = new Label(rightCol, SWT.NONE);
-			projectLabel.setText("  platform"); //$NON-NLS-1$
-			projectLabel.setForeground(dimTextColor);
-			projectLabel.setBackground(darkBg);
+		if (recentFiles.isEmpty()) {
+			Label noFiles = new Label(rightCol, SWT.NONE);
+			noFiles.setText("No recent files found"); //$NON-NLS-1$
+			noFiles.setForeground(dimTextColor);
+			noFiles.setBackground(darkBg);
+		} else {
+			for (Map.Entry<String, String> entry : recentFiles.entrySet()) {
+				String fileName = entry.getKey();
+				String filePath = entry.getValue();
+
+				Link fileLink = new Link(rightCol, SWT.NONE);
+				fileLink.setText("<a>" + fileName + "</a>"); //$NON-NLS-1$ //$NON-NLS-2$
+				fileLink.setToolTipText(filePath);
+				fileLink.setForeground(linkColor);
+				fileLink.setBackground(darkBg);
+
+				// Extract project/parent folder name from tooltip path
+				String projectName = extractProjectName(filePath, sourceWorkspace);
+				Label projectLabel = new Label(rightCol, SWT.NONE);
+				projectLabel.setText("  " + projectName); //$NON-NLS-1$
+				projectLabel.setForeground(dimTextColor);
+				projectLabel.setBackground(darkBg);
+			}
 		}
 
 		return page;
@@ -657,6 +672,71 @@ public class StyledChooseWorkspaceDialog extends Dialog {
 		String home = System.getProperty("user.home"); //$NON-NLS-1$
 		if (home != null && path.startsWith(home)) {
 			return "~" + path.substring(home.length()); //$NON-NLS-1$
+		}
+		return path;
+	}
+
+	/**
+	 * Reads the MRU (most recently used) file list from a workspace's
+	 * workbench.xml metadata file.
+	 *
+	 * @param workspacePath the root path of the workspace
+	 * @param maxEntries    maximum number of entries to return
+	 * @return ordered map of file name → tooltip/path, preserving MRU order
+	 */
+	private static Map<String, String> readRecentFiles(String workspacePath, int maxEntries) {
+		Map<String, String> result = new LinkedHashMap<>();
+		if (workspacePath == null || workspacePath.isBlank()) {
+			return result;
+		}
+		File workbenchXml = new File(workspacePath,
+				".metadata/.plugins/org.eclipse.ui.workbench/workbench.xml"); //$NON-NLS-1$
+		if (!workbenchXml.exists()) {
+			return result;
+		}
+		try (Reader reader = new FileReader(workbenchXml)) {
+			XMLMemento memento = XMLMemento.createReadRoot(reader);
+			IMemento mruMemento = memento.getChild("mruList"); //$NON-NLS-1$
+			if (mruMemento == null) {
+				return result;
+			}
+			for (IMemento child : mruMemento.getChildren("file")) { //$NON-NLS-1$
+				String name = child.getString("name"); //$NON-NLS-1$
+				String tooltip = child.getString("tooltip"); //$NON-NLS-1$
+				if (name != null && !name.isEmpty()) {
+					result.put(name, tooltip != null ? tooltip : name);
+					if (result.size() >= maxEntries) {
+						break;
+					}
+				}
+			}
+		} catch (Exception e) {
+			// Workspace metadata unreadable — return empty
+		}
+		return result;
+	}
+
+	/**
+	 * Extracts a meaningful project or parent folder name from a file path
+	 * relative to the workspace.
+	 */
+	private static String extractProjectName(String filePath, String workspacePath) {
+		if (filePath == null || filePath.isEmpty()) {
+			return ""; //$NON-NLS-1$
+		}
+		// Tooltip paths often start with "L/" or "/" followed by project/path
+		String path = filePath;
+		if (path.startsWith("L/") || path.startsWith("L\\")) { //$NON-NLS-1$ //$NON-NLS-2$
+			path = path.substring(2);
+		} else if (path.startsWith("/")) { //$NON-NLS-1$
+			path = path.substring(1);
+		}
+		int sep = path.indexOf('/');
+		if (sep < 0) {
+			sep = path.indexOf('\\');
+		}
+		if (sep > 0) {
+			return path.substring(0, sep);
 		}
 		return path;
 	}
