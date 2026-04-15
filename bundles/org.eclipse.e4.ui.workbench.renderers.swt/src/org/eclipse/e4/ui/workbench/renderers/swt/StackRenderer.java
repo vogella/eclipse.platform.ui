@@ -477,7 +477,12 @@ public class StackRenderer extends LazyStackRenderer {
 		// Do we have any stacks with place holders for the element
 		// that's changed?
 		MWindow win = modelService.getTopLevelWindowFor(part);
+		long _t0 = RendererPerfTracer.ENABLED ? RendererPerfTracer.begin() : 0;
 		List<MPlaceholder> refs = modelService.findElements(win, null, MPlaceholder.class, null);
+		if (RendererPerfTracer.ENABLED) {
+			RendererPerfTracer.trace(RendererPerfTracer.H02_FIND_PLACEHOLDERS_LABEL, _t0,
+					"refs=" + (refs != null ? refs.size() : 0)); //$NON-NLS-1$
+		}
 		if (refs != null) {
 			for (MPlaceholder ref : refs) {
 				if (ref.getRef() != part) {
@@ -656,8 +661,13 @@ public class StackRenderer extends LazyStackRenderer {
 
 		MPartStack pStack = (MPartStack) (partParent instanceof MPartStack ? partParent : null);
 
+		long _t0 = RendererPerfTracer.ENABLED ? RendererPerfTracer.begin() : 0;
 		List<MUIElement> activeElements = modelService.findElements(modelService.getTopLevelWindowFor(newActivePart),
 				null, MUIElement.class, singletonList(CSSConstants.CSS_ACTIVE_CLASS));
+		if (RendererPerfTracer.ENABLED) {
+			RendererPerfTracer.trace(RendererPerfTracer.H01_FIND_ACTIVE_ELEMENTS, _t0,
+					"found=" + activeElements.size()); //$NON-NLS-1$
+		}
 		for (MUIElement element : activeElements) {
 			if (element instanceof MPartStack && element != pStack) {
 				styleElement(element, false);
@@ -1146,7 +1156,12 @@ public class StackRenderer extends LazyStackRenderer {
 			return null;
 		}
 
+		long _t0 = RendererPerfTracer.ENABLED ? RendererPerfTracer.begin() : 0;
 		List<MPlaceholder> refs = modelService.findElements(win, null, MPlaceholder.class);
+		if (RendererPerfTracer.ENABLED) {
+			RendererPerfTracer.trace(RendererPerfTracer.H02_FIND_PLACEHOLDERS_ITEM, _t0,
+					"refs=" + (refs != null ? refs.size() : 0)); //$NON-NLS-1$
+		}
 		if (refs != null) {
 			for (MPlaceholder ref : refs) {
 				if (ref.getRef() != part) {
@@ -1471,6 +1486,7 @@ public class StackRenderer extends LazyStackRenderer {
 
 	@Override
 	protected void showTab(MUIElement element) {
+		long _t0 = RendererPerfTracer.ENABLED ? RendererPerfTracer.begin() : 0;
 		super.showTab(element);
 
 		// an invisible element won't have the correct widget hierarchy
@@ -1506,6 +1522,10 @@ public class StackRenderer extends LazyStackRenderer {
 
 		// Show the new state
 		adjustTopRight(tabFolder);
+		if (RendererPerfTracer.ENABLED) {
+			RendererPerfTracer.trace(RendererPerfTracer.H10_SHOW_TAB_NO_BATCH, _t0,
+					element.getClass().getSimpleName());
+		}
 	}
 
 	protected void showMenu(ToolItem item) {

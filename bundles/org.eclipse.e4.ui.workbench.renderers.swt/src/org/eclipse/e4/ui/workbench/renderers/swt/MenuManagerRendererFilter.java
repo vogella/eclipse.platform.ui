@@ -160,6 +160,8 @@ public class MenuManagerRendererFilter implements Listener {
 			MenuManagerRenderer renderer, MenuManager menuManager,
 			final IEclipseContext evalContext, final int recurseLevel,
 			boolean updateEnablement) {
+		long _t0 = RendererPerfTracer.ENABLED ? RendererPerfTracer.begin() : 0;
+		int contextCreationCount = 0;
 		final ExpressionContext exprContext = new ExpressionContext(evalContext);
 		HashSet<ContributionRecord> records = new HashSet<>();
 		for (MMenuElement element : menuModel.getChildren()) {
@@ -187,6 +189,7 @@ public class MenuManagerRendererFilter implements Listener {
 				EHandlerService handlerService = evalContext
 						.get(EHandlerService.class);
 				if (cmd != null && handlerService != null) {
+					contextCreationCount++;
 					final IEclipseContext staticContext = EclipseContextFactory
 							.create(MMRF_STATIC_CONTEXT);
 					ContributionsAnalyzer.populateModelInterfaces(item,
@@ -206,6 +209,7 @@ public class MenuManagerRendererFilter implements Listener {
 					((MItem) element).setEnabled(ici.isEnabled());
 				}
 			} else if (updateEnablement && element instanceof MDirectMenuItem contrib) {
+				contextCreationCount++;
 				if (contrib.getObject() == null) {
 					IContributionFactory icf = evalContext
 							.get(IContributionFactory.class);
@@ -233,6 +237,10 @@ public class MenuManagerRendererFilter implements Listener {
 					staticContext.dispose();
 				}
 			}
+		}
+		if (RendererPerfTracer.ENABLED) {
+			RendererPerfTracer.trace(RendererPerfTracer.H07_MENU_CONTEXT_PER_ITEM, _t0,
+					"children=" + menuModel.getChildren().size() + " ctxCreated=" + contextCreationCount); //$NON-NLS-1$ //$NON-NLS-2$
 		}
 	}
 

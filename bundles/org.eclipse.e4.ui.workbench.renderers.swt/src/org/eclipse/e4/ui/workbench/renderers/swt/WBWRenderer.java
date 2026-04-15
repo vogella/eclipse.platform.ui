@@ -591,8 +591,14 @@ public class WBWRenderer extends SWTPartRenderer {
 			return;
 		}
 
+		long _t0 = RendererPerfTracer.ENABLED ? RendererPerfTracer.begin() : 0;
 		List<MPartStack> stacks = modelService.findElements(perspective, null, MPartStack.class,
 				singletonList(CSSConstants.CSS_ACTIVE_CLASS));
+		if (RendererPerfTracer.ENABLED) {
+			RendererPerfTracer.trace(RendererPerfTracer.H09_WBW_FIND_STACKS, _t0,
+					"event=" + (event == SWT.Activate ? "Activate" : "Deactivate") //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
+					+ " found=" + stacks.size()); //$NON-NLS-1$
+		}
 		if (stacks.isEmpty()) {
 			return;
 		}

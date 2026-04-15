@@ -47,11 +47,14 @@ public class ToolItemUpdater implements Runnable {
 	}
 
 	public void updateContributionItems(Selector selector) {
+		long _t0 = RendererPerfTracer.ENABLED ? RendererPerfTracer.begin() : 0;
 		boolean doRunNow = false;
+		int matchCount = 0;
 		for (final AbstractContributionItem ci : itemsToCheck) {
 			if (ci.getModel() != null && ci.getModel().getParent() != null) {
 				if (selector.select(ci.getModel())) {
 					itemsToUpdateLater.add(ci);
+					matchCount++;
 					if (timestampOfEarliestQueuedUpdate == 0) {
 						timestampOfEarliestQueuedUpdate = System.nanoTime();
 					}
@@ -75,6 +78,10 @@ public class ToolItemUpdater implements Runnable {
 		}
 		if (doRunNow) {
 			run();
+		}
+		if (RendererPerfTracer.ENABLED) {
+			RendererPerfTracer.trace(RendererPerfTracer.H05_TOOL_ITEM_UPDATER, _t0,
+					"total=" + itemsToCheck.size() + " matched=" + matchCount); //$NON-NLS-1$ //$NON-NLS-2$
 		}
 	}
 

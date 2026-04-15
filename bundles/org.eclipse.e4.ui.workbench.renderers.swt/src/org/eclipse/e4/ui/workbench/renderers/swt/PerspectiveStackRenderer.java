@@ -102,10 +102,15 @@ public class PerspectiveStackRenderer extends LazyStackRenderer {
 		// Move any other controls to 'limbo'
 		Control[] kids = psComp.getChildren();
 		Shell limbo = (Shell) context.get("limbo"); //$NON-NLS-1$
+		long _t0 = RendererPerfTracer.ENABLED ? RendererPerfTracer.begin() : 0;
 		for (Control child : kids) {
 			if (child != ctrl) {
 				child.setParent(limbo);
 			}
+		}
+		if (RendererPerfTracer.ENABLED) {
+			RendererPerfTracer.trace(RendererPerfTracer.H11_LIMBO_REPARENT, _t0,
+					"children=" + kids.length); //$NON-NLS-1$
 		}
 	}
 }

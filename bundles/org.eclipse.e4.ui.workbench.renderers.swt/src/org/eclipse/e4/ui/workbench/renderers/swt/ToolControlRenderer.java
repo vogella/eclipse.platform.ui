@@ -218,6 +218,7 @@ public class ToolControlRenderer extends SWTPartRenderer {
 	@Optional
 	private void subscribeTopicAppStartup(
 			@SuppressWarnings("unused") @UIEventTopic(UIEvents.UILifeCycle.APP_STARTUP_COMPLETE) Event event) {
+		long _t0 = RendererPerfTracer.ENABLED ? RendererPerfTracer.begin() : 0;
 		List<MToolControl> toolControls = modelService.findElements(
 				application, null, MToolControl.class, null);
 		for (MToolControl toolControl : toolControls) {
@@ -225,6 +226,10 @@ public class ToolControlRenderer extends SWTPartRenderer {
 					IPresentationEngine.HIDDEN_EXPLICITLY)) {
 				toolControl.setVisible(false);
 			}
+		}
+		if (RendererPerfTracer.ENABLED) {
+			RendererPerfTracer.trace(RendererPerfTracer.H13_TOOLCTRL_STARTUP_SCAN, _t0,
+					"found=" + toolControls.size()); //$NON-NLS-1$
 		}
 	}
 

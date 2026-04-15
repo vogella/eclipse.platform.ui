@@ -225,6 +225,7 @@ public class AreaRenderer extends SWTPartRenderer {
 	}
 
 	private void synchCTFState(MArea areaModel) {
+		long _t0 = RendererPerfTracer.ENABLED ? RendererPerfTracer.begin() : 0;
 		List<MPartStack> stacks = findDirectStacks(areaModel);
 		int count = 0;
 		for (MPartStack stack : stacks) {
@@ -238,6 +239,10 @@ public class AreaRenderer extends SWTPartRenderer {
 			ensureCTF(areaModel, stacks);
 		} else {
 			ensureComposite(areaModel, stacks);
+		}
+		if (RendererPerfTracer.ENABLED) {
+			RendererPerfTracer.trace(RendererPerfTracer.H12_AREA_SYNCH_CTF, _t0,
+					"stacks=" + stacks.size() + " rendered=" + count); //$NON-NLS-1$ //$NON-NLS-2$
 		}
 	}
 
