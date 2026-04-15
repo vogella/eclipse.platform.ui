@@ -1484,28 +1484,34 @@ public class StackRenderer extends LazyStackRenderer {
 			createTab(element.getParent(), element);
 			tabItem = findItemForPart(element, element.getParent());
 		}
-		Control ctrl = (Control) element.getWidget();
-		if (ctrl != null && ctrl.getParent() != tabFolder) {
-			ctrl.setParent(tabFolder);
-			tabItem.setControl(ctrl);
-		} else if (element.getWidget() == null) {
-			Control tabCtrl = (Control) renderer.createGui(element);
-			tabItem.setControl(tabCtrl);
-		}
 
-		ignoreTabSelChanges = true;
-		// Ensure that the newly selected control is correctly sized
-		if (tabItem.getControl() instanceof Composite) {
-			Composite ctiComp = (Composite) tabItem.getControl();
-			// see bug 461573, 528720: call below is still needed to make view
-			// descriptions visible after unhiding the view with changed bounds
-			ctiComp.requestLayout();
-		}
-		tabFolder.setSelection(tabItem);
-		ignoreTabSelChanges = false;
+		// Suppress intermediate repaints while mutating the widget tree
+		tabFolder.setRedraw(false);
+		try {
+			Control ctrl = (Control) element.getWidget();
+			if (ctrl != null && ctrl.getParent() != tabFolder) {
+				ctrl.setParent(tabFolder);
+				tabItem.setControl(ctrl);
+			} else if (element.getWidget() == null) {
+				Control tabCtrl = (Control) renderer.createGui(element);
+				tabItem.setControl(tabCtrl);
+			}
 
-		// Show the new state
-		adjustTopRight(tabFolder);
+			ignoreTabSelChanges = true;
+			// Ensure that the newly selected control is correctly sized
+			if (tabItem.getControl() instanceof Composite ctiComp) {
+				// see bug 461573, 528720: call below is still needed to make view
+				// descriptions visible after unhiding the view with changed bounds
+				ctiComp.requestLayout();
+			}
+			tabFolder.setSelection(tabItem);
+			ignoreTabSelChanges = false;
+
+			// Show the new state
+			adjustTopRight(tabFolder);
+		} finally {
+			tabFolder.setRedraw(true);
+		}
 	}
 
 	protected void showMenu(ToolItem item) {
