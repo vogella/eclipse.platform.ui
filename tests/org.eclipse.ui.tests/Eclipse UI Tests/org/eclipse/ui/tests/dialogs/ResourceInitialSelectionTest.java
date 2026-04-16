@@ -43,6 +43,7 @@ import org.eclipse.ui.internal.decorators.DecoratorManager;
 import org.eclipse.ui.tests.harness.util.DisplayHelper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -73,7 +74,7 @@ public class ResourceInitialSelectionTest {
 	/**
 	 * Test that a resource is selected by default even without initial selection.
 	 */
-	@Test
+	@RepeatedTest(50)
 	public void testSingleSelectionAndNoInitialSelectionWithInitialPattern() {
 		boolean hasMultiSelection = false;
 		dialog = createDialog(hasMultiSelection);
@@ -93,7 +94,7 @@ public class ResourceInitialSelectionTest {
 	/**
 	 * Test that a specific resource can be selected by default.
 	 */
-	@Test
+	@RepeatedTest(50)
 	public void testSingleSelectionAndOneInitialSelectionWithInitialPattern() {
 		boolean hasMultiSelection = false;
 		dialog = createDialog(hasMultiSelection);
@@ -222,7 +223,7 @@ public class ResourceInitialSelectionTest {
 	 * Test that a specified resource can be selected by default when multi
 	 * selection is enabled.
 	 */
-	@Test
+	@RepeatedTest(50)
 	public void testMultiSelectionAndOneInitialSelectionWithInitialPattern() {
 		boolean hasMultiSelection = true;
 		dialog = createDialog(hasMultiSelection);
@@ -309,7 +310,7 @@ public class ResourceInitialSelectionTest {
 	/**
 	 * Test that several specified resources can be selected by default.
 	 */
-	@Test
+	@RepeatedTest(50)
 	public void testMultiSelectionAndTwoInitialSelectionsWithInitialPattern() {
 
 		boolean hasMultiSelection = true;
@@ -335,7 +336,7 @@ public class ResourceInitialSelectionTest {
 	 * Test that several specified resources can be selected by default but are
 	 * ignored if the initial pattern does not match.
 	 */
-	@Test
+	@RepeatedTest(50)
 	public void testMultiSelectionAndTwoInitialFilteredSelections() {
 
 		boolean hasMultiSelection = true;
@@ -462,7 +463,8 @@ public class ResourceInitialSelectionTest {
 		// Selection is applied only in the final refresh, so we must wait for
 		// stability rather than just for any non-zero count.
 		int[] lastCount = { -1 };
-		DisplayHelper.waitForCondition(display, 5000, () -> {
+		long startNanos = System.nanoTime();
+		boolean stable = DisplayHelper.waitForCondition(display, 5000, () -> {
 			processUIEvents();
 			try {
 				Table table = (Table) ((Composite) ((Composite) ((Composite) dialog.getShell().getChildren()[0])
@@ -477,9 +479,47 @@ public class ResourceInitialSelectionTest {
 				return false;
 			}
 		});
+		long waitedMs = (System.nanoTime() - startNanos) / 1_000_000L;
+		System.out.println("[ResourceInitialSelectionTest] waitForDialogRefresh: stable=" + stable
+				+ " lastCount=" + lastCount[0] + " waitedMs=" + waitedMs);
 
 		// Final event loop processing to pick up any trailing async tasks
 		processUIEvents();
+		dumpDialogState("after waitForDialogRefresh");
+	}
+
+	/**
+	 * Diagnostic helper: dump table item count, selection, and item labels.
+	 * Used to investigate flake on CI (issue #294). Remove before merge.
+	 */
+	private void dumpDialogState(String label) {
+		try {
+			Table table = (Table) ((Composite) ((Composite) ((Composite) dialog.getShell().getChildren()[0])
+					.getChildren()[0]).getChildren()[0]).getChildren()[3];
+			int count = table.getItemCount();
+			int[] selIdx = table.getSelectionIndices();
+			TableItem[] selItems = table.getSelection();
+			StringBuilder sb = new StringBuilder("[ResourceInitialSelectionTest] ").append(label)
+					.append(": itemCount=").append(count)
+					.append(" selectionIndices=").append(java.util.Arrays.toString(selIdx))
+					.append(" selectionData=[");
+			for (int i = 0; i < selItems.length; i++) {
+				if (i > 0) sb.append(", ");
+				Object data = selItems[i].getData();
+				sb.append(data == null ? "null" : data.toString());
+			}
+			sb.append("] firstItems=[");
+			int dump = Math.min(count, 5);
+			for (int i = 0; i < dump; i++) {
+				if (i > 0) sb.append(", ");
+				TableItem it = table.getItem(i);
+				sb.append(it == null ? "null" : it.getText());
+			}
+			sb.append("]");
+			System.out.println(sb);
+		} catch (Exception e) {
+			System.out.println("[ResourceInitialSelectionTest] " + label + " dump failed: " + e);
+		}
 	}
 
 	/**
