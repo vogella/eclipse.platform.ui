@@ -45,6 +45,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInfo;
 
 /**
  * Tests that FilteredResourcesSelectionDialog selects its initial selection
@@ -64,9 +65,12 @@ public class ResourceInitialSelectionTest {
 
 	private IProject project;
 
+	private String currentTestName;
+
 
 	@BeforeEach
-	public void doSetUp() throws Exception {
+	public void doSetUp(TestInfo info) throws Exception {
+		currentTestName = info.getDisplayName();
 		FILES.clear();
 		createProject();
 	}
@@ -74,7 +78,7 @@ public class ResourceInitialSelectionTest {
 	/**
 	 * Test that a resource is selected by default even without initial selection.
 	 */
-	@RepeatedTest(50)
+	@RepeatedTest(500)
 	public void testSingleSelectionAndNoInitialSelectionWithInitialPattern() {
 		boolean hasMultiSelection = false;
 		dialog = createDialog(hasMultiSelection);
@@ -88,13 +92,13 @@ public class ResourceInitialSelectionTest {
 
 		List<Object> selected = getSelectedItems(dialog);
 
-		assertFalse(selected.isEmpty(), "One file should be selected by default");
+		assertWithDump(() -> assertFalse(selected.isEmpty(), "One file should be selected by default"));
 	}
 
 	/**
 	 * Test that a specific resource can be selected by default.
 	 */
-	@RepeatedTest(50)
+	@RepeatedTest(500)
 	public void testSingleSelectionAndOneInitialSelectionWithInitialPattern() {
 		boolean hasMultiSelection = false;
 		dialog = createDialog(hasMultiSelection);
@@ -109,7 +113,7 @@ public class ResourceInitialSelectionTest {
 
 		List<Object> selected = getSelectedItems(dialog);
 
-		assertEquals(asList(FILES.get("foo.txt")), selected, "One file should be selected by default");
+		assertWithDump(() -> assertEquals(asList(FILES.get("foo.txt")), selected, "One file should be selected by default"));
 	}
 
 	/**
@@ -216,14 +220,14 @@ public class ResourceInitialSelectionTest {
 
 		List<Object> selected = getSelectedItems(dialog);
 
-		assertFalse(selected.isEmpty(), "One file should be selected by default");
+		assertWithDump(() -> assertFalse(selected.isEmpty(), "One file should be selected by default"));
 	}
 
 	/**
 	 * Test that a specified resource can be selected by default when multi
 	 * selection is enabled.
 	 */
-	@RepeatedTest(50)
+	@RepeatedTest(500)
 	public void testMultiSelectionAndOneInitialSelectionWithInitialPattern() {
 		boolean hasMultiSelection = true;
 		dialog = createDialog(hasMultiSelection);
@@ -238,7 +242,7 @@ public class ResourceInitialSelectionTest {
 
 		List<Object> selected = getSelectedItems(dialog);
 
-		assertEquals(asList(FILES.get("foo.txt")), selected, "One file should be selected by default");
+		assertWithDump(() -> assertEquals(asList(FILES.get("foo.txt")), selected, "One file should be selected by default"));
 	}
 
 	/**
@@ -310,7 +314,7 @@ public class ResourceInitialSelectionTest {
 	/**
 	 * Test that several specified resources can be selected by default.
 	 */
-	@RepeatedTest(50)
+	@RepeatedTest(500)
 	public void testMultiSelectionAndTwoInitialSelectionsWithInitialPattern() {
 
 		boolean hasMultiSelection = true;
@@ -329,14 +333,14 @@ public class ResourceInitialSelectionTest {
 		boolean initialElementsAreSelected = selected.containsAll(initialSelection)
 				&& initialSelection.containsAll(selected);
 
-		assertTrue(initialElementsAreSelected, "Two files should be selected by default");
+		assertWithDump(() -> assertTrue(initialElementsAreSelected, "Two files should be selected by default"));
 	}
 
 	/**
 	 * Test that several specified resources can be selected by default but are
 	 * ignored if the initial pattern does not match.
 	 */
-	@RepeatedTest(50)
+	@RepeatedTest(500)
 	public void testMultiSelectionAndTwoInitialFilteredSelections() {
 
 		boolean hasMultiSelection = true;
@@ -355,7 +359,7 @@ public class ResourceInitialSelectionTest {
 		boolean initialElementsAreSelected = selected.containsAll(expectedSelection)
 				&& expectedSelection.containsAll(selected);
 
-		assertTrue(initialElementsAreSelected, "Two files should be selected by default");
+		assertWithDump(() -> assertTrue(initialElementsAreSelected, "Two files should be selected by default"));
 	}
 
 	private FilteredResourcesSelectionDialog createDialog(boolean multiSelection) {
@@ -480,12 +484,28 @@ public class ResourceInitialSelectionTest {
 			}
 		});
 		long waitedMs = (System.nanoTime() - startNanos) / 1_000_000L;
-		System.out.println("[ResourceInitialSelectionTest] waitForDialogRefresh: stable=" + stable
-				+ " lastCount=" + lastCount[0] + " waitedMs=" + waitedMs);
+		// Only log when something looks suspicious to keep CI logs manageable.
+		if (!stable || waitedMs > 500 || lastCount[0] <= 0) {
+			System.out.println("[#294] " + currentTestName + " waitForDialogRefresh: stable=" + stable
+					+ " lastCount=" + lastCount[0] + " waitedMs=" + waitedMs);
+			dumpDialogState("after waitForDialogRefresh");
+		}
 
 		// Final event loop processing to pick up any trailing async tasks
 		processUIEvents();
-		dumpDialogState("after waitForDialogRefresh");
+	}
+
+	/**
+	 * Diagnostic helper: assert and dump table state with test name on failure.
+	 */
+	private void assertWithDump(Runnable assertion) {
+		try {
+			assertion.run();
+		} catch (Throwable t) {
+			System.out.println("[#294] FAIL " + currentTestName + ": " + t.getMessage());
+			dumpDialogState("on failure");
+			throw t;
+		}
 	}
 
 	/**
