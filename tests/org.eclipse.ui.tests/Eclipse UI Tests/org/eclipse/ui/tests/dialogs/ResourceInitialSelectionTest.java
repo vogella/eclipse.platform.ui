@@ -38,14 +38,13 @@ import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Table;
 import org.eclipse.swt.widgets.TableItem;
 import org.eclipse.ui.PlatformUI;
+import org.eclipse.ui.dialogs.FilteredItemsSelectionDialog;
 import org.eclipse.ui.dialogs.FilteredResourcesSelectionDialog;
 import org.eclipse.ui.internal.decorators.DecoratorManager;
 import org.eclipse.ui.tests.harness.util.DisplayHelper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestInfo;
 
 /**
  * Tests that FilteredResourcesSelectionDialog selects its initial selection
@@ -65,12 +64,9 @@ public class ResourceInitialSelectionTest {
 
 	private IProject project;
 
-	private String currentTestName;
-
 
 	@BeforeEach
-	public void doSetUp(TestInfo info) throws Exception {
-		currentTestName = info.getDisplayName();
+	public void doSetUp() throws Exception {
 		FILES.clear();
 		createProject();
 	}
@@ -78,7 +74,7 @@ public class ResourceInitialSelectionTest {
 	/**
 	 * Test that a resource is selected by default even without initial selection.
 	 */
-	@RepeatedTest(500)
+	@Test
 	public void testSingleSelectionAndNoInitialSelectionWithInitialPattern() {
 		boolean hasMultiSelection = false;
 		dialog = createDialog(hasMultiSelection);
@@ -92,13 +88,13 @@ public class ResourceInitialSelectionTest {
 
 		List<Object> selected = getSelectedItems(dialog);
 
-		assertWithDump(() -> assertFalse(selected.isEmpty(), "One file should be selected by default"));
+		assertFalse(selected.isEmpty(), "One file should be selected by default");
 	}
 
 	/**
 	 * Test that a specific resource can be selected by default.
 	 */
-	@RepeatedTest(500)
+	@Test
 	public void testSingleSelectionAndOneInitialSelectionWithInitialPattern() {
 		boolean hasMultiSelection = false;
 		dialog = createDialog(hasMultiSelection);
@@ -113,7 +109,7 @@ public class ResourceInitialSelectionTest {
 
 		List<Object> selected = getSelectedItems(dialog);
 
-		assertWithDump(() -> assertEquals(asList(FILES.get("foo.txt")), selected, "One file should be selected by default"));
+		assertEquals(asList(FILES.get("foo.txt")), selected, "One file should be selected by default");
 	}
 
 	/**
@@ -130,8 +126,11 @@ public class ResourceInitialSelectionTest {
 		dialog.open();
 		dialog.refresh();
 
-		// Don't wait for full refresh - this test checks that invalid initial
-		// selections don't cause a selection before dialog is fully loaded
+		// Intentionally no waitForDialogRefresh: this asserts that during
+		// initial load, the dialog does not pre-select anything for an
+		// invalid initial element. After the refresh pipeline drains the
+		// dialog falls back to selecting row 0, which is a separate
+		// behavior not under test here.
 
 		List<Object> selected = getSelectedItems(dialog);
 
@@ -172,8 +171,10 @@ public class ResourceInitialSelectionTest {
 		dialog.open();
 		dialog.refresh();
 
-		// Don't wait for full refresh - this test checks that filtered initial
-		// selections don't cause a selection before dialog is fully loaded
+		// Intentionally no waitForDialogRefresh: foofoo is filtered out by
+		// the *.txt pattern, so during initial load nothing is selected.
+		// After the refresh pipeline drains the dialog falls back to row 0,
+		// which is a separate behavior not under test here.
 
 		List<Object> selected = getSelectedItems(dialog);
 
@@ -220,14 +221,14 @@ public class ResourceInitialSelectionTest {
 
 		List<Object> selected = getSelectedItems(dialog);
 
-		assertWithDump(() -> assertFalse(selected.isEmpty(), "One file should be selected by default"));
+		assertFalse(selected.isEmpty(), "One file should be selected by default");
 	}
 
 	/**
 	 * Test that a specified resource can be selected by default when multi
 	 * selection is enabled.
 	 */
-	@RepeatedTest(500)
+	@Test
 	public void testMultiSelectionAndOneInitialSelectionWithInitialPattern() {
 		boolean hasMultiSelection = true;
 		dialog = createDialog(hasMultiSelection);
@@ -242,7 +243,7 @@ public class ResourceInitialSelectionTest {
 
 		List<Object> selected = getSelectedItems(dialog);
 
-		assertWithDump(() -> assertEquals(asList(FILES.get("foo.txt")), selected, "One file should be selected by default"));
+		assertEquals(asList(FILES.get("foo.txt")), selected, "One file should be selected by default");
 	}
 
 	/**
@@ -279,8 +280,11 @@ public class ResourceInitialSelectionTest {
 		dialog.open();
 		dialog.refresh();
 
-		// Don't wait for full refresh - this test checks that invalid initial
-		// selections don't cause a selection before dialog is fully loaded
+		// Intentionally no waitForDialogRefresh: this asserts that during
+		// initial load, the dialog does not pre-select anything for invalid
+		// initial elements. After the refresh pipeline drains the dialog
+		// falls back to selecting row 0, which is a separate behavior not
+		// under test here.
 
 		List<Object> selected = getSelectedItems(dialog);
 
@@ -314,7 +318,7 @@ public class ResourceInitialSelectionTest {
 	/**
 	 * Test that several specified resources can be selected by default.
 	 */
-	@RepeatedTest(500)
+	@Test
 	public void testMultiSelectionAndTwoInitialSelectionsWithInitialPattern() {
 
 		boolean hasMultiSelection = true;
@@ -333,14 +337,14 @@ public class ResourceInitialSelectionTest {
 		boolean initialElementsAreSelected = selected.containsAll(initialSelection)
 				&& initialSelection.containsAll(selected);
 
-		assertWithDump(() -> assertTrue(initialElementsAreSelected, "Two files should be selected by default"));
+		assertTrue(initialElementsAreSelected, "Two files should be selected by default");
 	}
 
 	/**
 	 * Test that several specified resources can be selected by default but are
 	 * ignored if the initial pattern does not match.
 	 */
-	@RepeatedTest(500)
+	@Test
 	public void testMultiSelectionAndTwoInitialFilteredSelections() {
 
 		boolean hasMultiSelection = true;
@@ -359,7 +363,7 @@ public class ResourceInitialSelectionTest {
 		boolean initialElementsAreSelected = selected.containsAll(expectedSelection)
 				&& expectedSelection.containsAll(selected);
 
-		assertWithDump(() -> assertTrue(initialElementsAreSelected, "Two files should be selected by default"));
+		assertTrue(initialElementsAreSelected, "Two files should be selected by default");
 	}
 
 	private FilteredResourcesSelectionDialog createDialog(boolean multiSelection) {
@@ -453,93 +457,22 @@ public class ResourceInitialSelectionTest {
 	}
 
 	/**
-	 * Wait for dialog refresh jobs to complete and process UI events.
-	 * This ensures background jobs finish before assertions are made.
+	 * Wait for the dialog's background filter/refresh jobs to complete.
+	 * <p>
+	 * The dialog schedules a chain of jobs on open/refresh:
+	 * {@code FilterHistoryJob → FilterJob → RefreshCacheJob → RefreshJob}. All
+	 * four are tagged with {@link FilteredItemsSelectionDialog#JOB_FAMILY}, so
+	 * we wait for that family to drain. The 30 s ceiling is a deadlock guard;
+	 * the pipeline usually completes within a few hundred milliseconds.
 	 */
 	private void waitForDialogRefresh() {
 		Display display = PlatformUI.getWorkbench().getDisplay();
-
-		// The dialog performs async operations (FilterHistoryJob → FilterJob →
-		// RefreshCacheJob → RefreshJob) to filter and populate the table after refresh()
-		// We need to wait for the table item count to stabilize before checking
-		// selection state. The count can temporarily be non-zero after the history
-		// refresh, then change again when FilterJob populates actual results.
-		// Selection is applied only in the final refresh, so we must wait for
-		// stability rather than just for any non-zero count.
-		int[] lastCount = { -1 };
-		long startNanos = System.nanoTime();
-		boolean stable = DisplayHelper.waitForCondition(display, 5000, () -> {
+		DisplayHelper.waitForCondition(display, 30_000L, () -> {
 			processUIEvents();
-			try {
-				Table table = (Table) ((Composite) ((Composite) ((Composite) dialog.getShell().getChildren()[0])
-						.getChildren()[0]).getChildren()[0]).getChildren()[3];
-				int count = table.getItemCount();
-				if (count > 0 && count == lastCount[0]) {
-					return true; // stable non-zero count: all refreshes have completed
-				}
-				lastCount[0] = count;
-				return false;
-			} catch (Exception e) {
-				return false;
-			}
+			return Job.getJobManager().find(FilteredItemsSelectionDialog.JOB_FAMILY).length == 0;
 		});
-		long waitedMs = (System.nanoTime() - startNanos) / 1_000_000L;
-		// Only log when something looks suspicious to keep CI logs manageable.
-		if (!stable || waitedMs > 500 || lastCount[0] <= 0) {
-			System.out.println("[#294] " + currentTestName + " waitForDialogRefresh: stable=" + stable
-					+ " lastCount=" + lastCount[0] + " waitedMs=" + waitedMs);
-			dumpDialogState("after waitForDialogRefresh");
-		}
-
-		// Final event loop processing to pick up any trailing async tasks
+		// Final event loop processing to pick up any trailing asyncExecs.
 		processUIEvents();
-	}
-
-	/**
-	 * Diagnostic helper: assert and dump table state with test name on failure.
-	 */
-	private void assertWithDump(Runnable assertion) {
-		try {
-			assertion.run();
-		} catch (Throwable t) {
-			System.out.println("[#294] FAIL " + currentTestName + ": " + t.getMessage());
-			dumpDialogState("on failure");
-			throw t;
-		}
-	}
-
-	/**
-	 * Diagnostic helper: dump table item count, selection, and item labels.
-	 * Used to investigate flake on CI (issue #294). Remove before merge.
-	 */
-	private void dumpDialogState(String label) {
-		try {
-			Table table = (Table) ((Composite) ((Composite) ((Composite) dialog.getShell().getChildren()[0])
-					.getChildren()[0]).getChildren()[0]).getChildren()[3];
-			int count = table.getItemCount();
-			int[] selIdx = table.getSelectionIndices();
-			TableItem[] selItems = table.getSelection();
-			StringBuilder sb = new StringBuilder("[ResourceInitialSelectionTest] ").append(label)
-					.append(": itemCount=").append(count)
-					.append(" selectionIndices=").append(java.util.Arrays.toString(selIdx))
-					.append(" selectionData=[");
-			for (int i = 0; i < selItems.length; i++) {
-				if (i > 0) sb.append(", ");
-				Object data = selItems[i].getData();
-				sb.append(data == null ? "null" : data.toString());
-			}
-			sb.append("] firstItems=[");
-			int dump = Math.min(count, 5);
-			for (int i = 0; i < dump; i++) {
-				if (i > 0) sb.append(", ");
-				TableItem it = table.getItem(i);
-				sb.append(it == null ? "null" : it.getText());
-			}
-			sb.append("]");
-			System.out.println(sb);
-		} catch (Exception e) {
-			System.out.println("[ResourceInitialSelectionTest] " + label + " dump failed: " + e);
-		}
 	}
 
 	/**
