@@ -33,6 +33,8 @@ import org.eclipse.e4.ui.tests.rules.WorkbenchContextExtension;
 import org.eclipse.e4.ui.workbench.IWorkbench;
 import org.eclipse.e4.ui.workbench.modeling.EModelService;
 import org.eclipse.e4.ui.workbench.modeling.EPartService;
+import org.junit.jupiter.api.RepeatedTest;
+import org.junit.jupiter.api.RepetitionInfo;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
@@ -134,8 +136,9 @@ public class PartOnTopManagerTest {
 		assertTrue(isPartOnTop(secondPart));
 	}
 
-	@Test
-	public void test_PlaceholderOnTopStackSwitch() {
+	@RepeatedTest(500)
+	public void test_PlaceholderOnTopStackSwitch(RepetitionInfo info) {
+		int rep = info.getCurrentRepetition();
 		MWindow window = ems.createModelElement(MWindow.class);
 		application.getChildren().add(window);
 		application.setSelectedElement(window);
@@ -167,19 +170,48 @@ public class PartOnTopManagerTest {
 
 		contextRule.createAndRunWorkbench(window);
 
-		assertTrue(isPartOnTop(part));
-		assertFalse(isPartOnTop(secondPart));
+		traceOnTop("#3893 rep=" + rep + " after-createAndRunWorkbench", part, secondPart);
+		assertWithTrace(rep, "after-createAndRunWorkbench: part should be on top",
+				() -> assertTrue(isPartOnTop(part)), part, secondPart);
+		assertWithTrace(rep, "after-createAndRunWorkbench: secondPart should not be on top",
+				() -> assertFalse(isPartOnTop(secondPart)), part, secondPart);
 
 		partStack.setSelectedElement(secondPart);
+		traceOnTop("#3893 rep=" + rep + " after-select-secondPart", part, secondPart);
 
-		assertFalse(isPartOnTop(part));
-		assertTrue(isPartOnTop(secondPart));
+		assertWithTrace(rep, "after-select-secondPart: part should NOT be on top (flake here)",
+				() -> assertFalse(isPartOnTop(part)), part, secondPart);
+		assertWithTrace(rep, "after-select-secondPart: secondPart should be on top",
+				() -> assertTrue(isPartOnTop(secondPart)), part, secondPart);
 
 		partStack.setSelectedElement(placeholder);
+		traceOnTop("#3893 rep=" + rep + " after-select-placeholder", part, secondPart);
 
-		assertTrue(isPartOnTop(part));
-		assertFalse(isPartOnTop(secondPart));
+		assertWithTrace(rep, "after-select-placeholder: part should be on top",
+				() -> assertTrue(isPartOnTop(part)), part, secondPart);
+		assertWithTrace(rep, "after-select-placeholder: secondPart should not be on top",
+				() -> assertFalse(isPartOnTop(secondPart)), part, secondPart);
+	}
 
+	private void traceOnTop(String label, MPart part, MPart secondPart) {
+		Object partFlag = part.getContext() == null ? "no-ctx" : part.getContext().get(IWorkbench.ON_TOP);
+		Object secondFlag = secondPart.getContext() == null ? "no-ctx"
+				: secondPart.getContext().get(IWorkbench.ON_TOP);
+		System.out.println("[#3893] " + label
+				+ " part.ctx=" + (part.getContext() == null ? "null" : "ok")
+				+ " part.ON_TOP=" + partFlag
+				+ " secondPart.ctx=" + (secondPart.getContext() == null ? "null" : "ok")
+				+ " secondPart.ON_TOP=" + secondFlag);
+	}
+
+	private void assertWithTrace(int rep, String step, Runnable assertion, MPart part, MPart secondPart) {
+		try {
+			assertion.run();
+		} catch (Throwable t) {
+			System.out.println("[#3893] FAIL rep=" + rep + " step=" + step + " -> " + t.getMessage());
+			traceOnTop("#3893 rep=" + rep + " FAIL " + step, part, secondPart);
+			throw t;
+		}
 	}
 
 	@Test
