@@ -90,8 +90,8 @@ public class ScopePart {
 	private Text fWorkingSetText;
 	private IWorkingSet[] fWorkingSets;
 
-	// Reference to its search page container (can be null)
-	private final SearchDialog fSearchDialog;
+	// Reference to its search page container site (can be null)
+	private final ISearchPageContainerSite fSearchDialog;
 
 	private boolean fActiveEditorCanProvideScopeSelection;
 
@@ -99,15 +99,15 @@ public class ScopePart {
 	 * Returns a new scope part with workspace as initial scope. The part is not
 	 * yet created.
 	 *
-	 * @param searchDialog
-	 *            The parent container
+	 * @param site
+	 *            The parent container site
 	 * @param searchEnclosingProjects
 	 *            If true, add the 'search enclosing project' radio button
 	 * @param searchOpenedEditors
 	 *            If true, add the 'search opened editors' radio button
 	 */
-	public ScopePart(SearchDialog searchDialog, boolean searchEnclosingProjects, boolean searchOpenedEditors) {
-		fSearchDialog= searchDialog;
+	public ScopePart(ISearchPageContainerSite site, boolean searchEnclosingProjects, boolean searchOpenedEditors) {
+		fSearchDialog= site;
 		fCanSearchEnclosingProjects= searchEnclosingProjects;
 		fCanSearchOpenedEditors = searchOpenedEditors;
 

@@ -56,6 +56,7 @@ public class SearchPreferencePage extends FieldEditorPreferencePage implements I
 	public static final String TEXT_SEARCH_ENGINE = TextSearchEngineRegistry.PREFERENCE_ENGINE_KEY;
 	public static final String TEXT_SEARCH_QUERY_PROVIDER = "org.eclipse.search.textSearchQueryProvider"; //$NON-NLS-1$
 	public static final String LIMIT_HISTORY= "org.eclipse.search.limitHistory"; //$NON-NLS-1$
+	public static final String USE_SEARCH_VIEW_FOR_CTRL_H = "org.eclipse.search.useSearchViewForCtrlH"; //$NON-NLS-1$
 
 	private ColorFieldEditor fColorEditor;
 	private BooleanFieldEditor fEmphasizedCheckbox;
@@ -91,6 +92,7 @@ public class SearchPreferencePage extends FieldEditorPreferencePage implements I
 		store.setDefault(TEXT_SEARCH_ENGINE, ""); //default search engine is empty string //$NON-NLS-1$
 		store.setDefault(TEXT_SEARCH_QUERY_PROVIDER, ""); // default query provider is empty string  //$NON-NLS-1$
 		store.setDefault(LIMIT_HISTORY, 10);
+		store.setDefault(USE_SEARCH_VIEW_FOR_CTRL_H, false);
 	}
 
 
@@ -104,6 +106,8 @@ public class SearchPreferencePage extends FieldEditorPreferencePage implements I
 	protected void createFieldEditors() {
 		addField(new BooleanFieldEditor(REUSE_EDITOR, SearchMessages.SearchPreferencePage_reuseEditor, getFieldEditorParent()));
 		addField(new BooleanFieldEditor(BRING_VIEW_TO_FRONT, SearchMessages.SearchPreferencePage_bringToFront, getFieldEditorParent()));
+		addField(new BooleanFieldEditor(USE_SEARCH_VIEW_FOR_CTRL_H,
+				SearchMessages.SearchPreferencePage_useSearchView, getFieldEditorParent()));
 
 		fIgnorePotentialMatchesCheckbox= new BooleanFieldEditor(
 			IGNORE_POTENTIAL_MATCHES,
@@ -237,6 +241,11 @@ public class SearchPreferencePage extends FieldEditorPreferencePage implements I
 	public static boolean arePotentialMatchesIgnored() {
 		IPreferenceStore store= SearchPlugin.getDefault().getPreferenceStore();
 		return store.getBoolean(IGNORE_POTENTIAL_MATCHES);
+	}
+
+	public static boolean isUseSearchViewForCtrlH() {
+		IPreferenceStore store = SearchPlugin.getDefault().getPreferenceStore();
+		return store.getBoolean(USE_SEARCH_VIEW_FOR_CTRL_H);
 	}
 
 	public static boolean rememberLastUsedPage() {

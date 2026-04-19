@@ -203,6 +203,11 @@ public final class SearchMessages extends NLS {
 	public static String SearchPreferencePage_potentialMatchFgColor;
 	public static String SearchPreferencePage_reuseEditor;
 	public static String SearchPreferencePage_bringToFront;
+	public static String SearchPreferencePage_useSearchView;
+	public static String SearchInputView_searchAction;
+	public static String SearchInputView_replaceAction;
+	public static String SearchInputView_pageLabel;
+	public static String SearchInputView_title;
 	public static String SearchPreferencePage_defaultPerspective;
 	public static String SearchPreferencePage_defaultPerspective_none;
 	public static String SearchPreferencePage_ignorePotentialMatches;

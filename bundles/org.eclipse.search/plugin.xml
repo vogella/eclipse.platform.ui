@@ -309,6 +309,14 @@
             allowMultiple="true"
             id="org.eclipse.search.ui.views.SearchView">
       	</view>
+      	<view
+            name="%searchInputViewName"
+            icon="$nl$/icons/full/etool16/search.svg"
+            category="org.eclipse.ui"
+            class="org.eclipse.search.internal.ui.SearchInputView"
+            allowMultiple="false"
+            id="org.eclipse.search.ui.views.SearchInputView">
+      	</view>
 	</extension>
    
 <!-- Default search results view -->

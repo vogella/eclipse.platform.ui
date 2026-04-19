@@ -95,7 +95,7 @@ import org.eclipse.search.ui.ISearchPageScoreComputer;
 
 
 public class SearchDialog extends ExtendedDialogWindow
-		implements ISearchPageContainer, IPageChangeProvider, IScopeChangeProvider {
+		implements ISearchPageContainer, ISearchPageContainerSite, IPageChangeProvider, IScopeChangeProvider {
 
 	// Dialog store id constants
 	private static final String DIALOG_NAME= "SearchDialog"; //$NON-NLS-1$
@@ -262,6 +262,7 @@ public class SearchDialog extends ExtendedDialogWindow
 		PlatformUI.getWorkbench().getHelpSystem().setHelp(shell, ISearchHelpContextIds.SEARCH_DIALOG);
 	}
 
+	@Override
 	public IWorkbenchWindow getWorkbenchWindow() {
 		return fWorkbenchWindow;
 	}
@@ -271,6 +272,7 @@ public class SearchDialog extends ExtendedDialogWindow
 		return fCurrentSelection;
 	}
 
+	@Override
 	public IEditorPart getActiveEditor() {
 		IWorkbenchPage activePage= fWorkbenchWindow.getActivePage();
 		if (activePage == null) {
@@ -649,6 +651,7 @@ public class SearchDialog extends ExtendedDialogWindow
 		return fScopeParts[fCurrentIndex].getSelectedWorkingSets();
 	}
 
+	@Override
 	public String[] getEnclosingProjectNames() {
 		return fCurrentEnclosingProject;
 	}
@@ -736,6 +739,7 @@ public class SearchDialog extends ExtendedDialogWindow
 	 * Note: This is a special method to be called only from the ScopePart
 	 * </p>
 	 */
+	@Override
 	public void notifyScopeSelectionChanged() {
 		setPerformActionEnabled(fLastEnableState);
 		if (fScopeChangeListeners != null && !fScopeChangeListeners.isEmpty()) {

@@ -17,8 +17,11 @@ import org.eclipse.jface.action.Action;
 import org.eclipse.jface.action.IAction;
 import org.eclipse.jface.viewers.ISelection;
 
+import org.eclipse.ui.IViewPart;
+import org.eclipse.ui.IWorkbenchPage;
 import org.eclipse.ui.IWorkbenchWindow;
 import org.eclipse.ui.IWorkbenchWindowActionDelegate;
+import org.eclipse.ui.PartInitException;
 
 /**
  * Opens the Search Dialog.
@@ -52,11 +55,25 @@ public class OpenSearchDialogAction extends Action implements IWorkbenchWindowAc
 
 	@Override
 	public void run() {
-		if (getWorkbenchWindow().getActivePage() == null) {
+		IWorkbenchWindow window = getWorkbenchWindow();
+		IWorkbenchPage activePage = window != null ? window.getActivePage() : null;
+		if (activePage == null) {
 			SearchPlugin.beep();
 			return;
 		}
-		SearchDialog dialog= new SearchDialog(getWorkbenchWindow(), fPageId);
+		if (SearchPreferencePage.isUseSearchViewForCtrlH() && fPageId == null) {
+			try {
+				IViewPart view = activePage.showView(SearchInputView.VIEW_ID);
+				if (view instanceof SearchInputView inputView) {
+					inputView.refreshSelectionContext();
+				}
+				return;
+			} catch (PartInitException e) {
+				SearchPlugin.log(e);
+				// fall back to dialog
+			}
+		}
+		SearchDialog dialog= new SearchDialog(window, fPageId);
 		dialog.open();
 	}
 
