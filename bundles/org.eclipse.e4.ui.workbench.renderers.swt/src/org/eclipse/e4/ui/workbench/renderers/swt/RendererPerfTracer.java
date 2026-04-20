@@ -16,8 +16,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.atomic.AtomicBoolean;
-import org.eclipse.swt.widgets.Display;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Lightweight performance tracer for renderer hotspots.
@@ -28,15 +29,19 @@ import org.eclipse.swt.widgets.Display;
  * The CSV format is:
  * {@code timestamp_ms,hotspot_id,duration_ns,detail}
  * <p>
- * Trace records are queued lock-free and flushed asynchronously to avoid
- * blocking the UI thread.
+ * Trace records are queued lock-free on the producer side and drained by a
+ * single daemon flusher thread every 500 ms. The flusher holds one open
+ * {@link BufferedWriter} for the lifetime of the JVM; a shutdown hook drains
+ * the queue and closes the writer so the last events are not lost.
  */
 public final class RendererPerfTracer {
 
-	/** Master switch — always enabled in this debug build. */
+	/** Master switch. Always enabled in this debug build. */
 	public static final boolean ENABLED = true;
 
-	// Hotspot IDs matching the items in docs/performance.md
+	// Hotspot IDs matching the items in docs/performance.md.
+	// H08 is intentionally unused: an earlier draft reserved it for a
+	// ContentProvider hotspot that turned out to be negligible during analysis.
 	public static final String H01_FIND_ACTIVE_ELEMENTS = "H01_findActiveElements"; //$NON-NLS-1$
 	public static final String H02_FIND_PLACEHOLDERS_LABEL = "H02_findPlaceholders_label"; //$NON-NLS-1$
 	public static final String H02_FIND_PLACEHOLDERS_ITEM = "H02_findPlaceholders_item"; //$NON-NLS-1$
@@ -54,9 +59,11 @@ public final class RendererPerfTracer {
 	public static final String W1_SASH_SYNC_LAYOUT = "W1_sash_syncLayout_win"; //$NON-NLS-1$
 
 	private static final ConcurrentLinkedQueue<String> QUEUE = new ConcurrentLinkedQueue<>();
-	private static final AtomicBoolean FLUSH_SCHEDULED = new AtomicBoolean(false);
 	private static final Path OUTPUT_FILE;
 	private static final long START_TIME = System.nanoTime();
+	private static final Object WRITER_LOCK = new Object();
+	private static final BufferedWriter WRITER;
+	private static final ScheduledExecutorService FLUSHER;
 
 	static {
 		String fileProp = System.getProperty("eclipse.renderer.perf.trace.file"); //$NON-NLS-1$
@@ -65,15 +72,30 @@ public final class RendererPerfTracer {
 		} else {
 			OUTPUT_FILE = Path.of(System.getProperty("user.home"), "renderer-perf-trace.csv"); //$NON-NLS-1$ //$NON-NLS-2$
 		}
+		BufferedWriter writer = null;
 		if (ENABLED) {
 			try {
-				Files.writeString(OUTPUT_FILE,
-						"timestamp_ms,hotspot_id,duration_ns,detail\n", //$NON-NLS-1$
+				writer = Files.newBufferedWriter(OUTPUT_FILE,
 						StandardOpenOption.CREATE,
 						StandardOpenOption.TRUNCATE_EXISTING);
+				writer.write("timestamp_ms,hotspot_id,duration_ns,detail\n"); //$NON-NLS-1$
+				writer.flush();
 			} catch (IOException e) {
 				System.err.println("RendererPerfTracer: failed to open " + OUTPUT_FILE + ": " + e); //$NON-NLS-1$ //$NON-NLS-2$
+				writer = null;
 			}
+		}
+		WRITER = writer;
+
+		FLUSHER = Executors.newSingleThreadScheduledExecutor(r -> {
+			Thread t = new Thread(r, "RendererPerfTracer-Flusher"); //$NON-NLS-1$
+			t.setDaemon(true);
+			return t;
+		});
+		if (ENABLED && WRITER != null) {
+			FLUSHER.scheduleWithFixedDelay(RendererPerfTracer::flush, 500, 500, TimeUnit.MILLISECONDS);
+			Runtime.getRuntime().addShutdownHook(
+					new Thread(RendererPerfTracer::shutdown, "RendererPerfTracer-Shutdown")); //$NON-NLS-1$
 		}
 	}
 
@@ -95,11 +117,10 @@ public final class RendererPerfTracer {
 	 */
 	public static void trace(String hotspotId, long startNano, String detail) {
 		long durationNs = System.nanoTime() - startNano;
-		long wallMs = (System.nanoTime() - START_TIME) / 1_000_000L;
-		String line = wallMs + "," + hotspotId + "," + durationNs + "," //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
+		long elapsedMs = (System.nanoTime() - START_TIME) / 1_000_000L;
+		String line = elapsedMs + "," + hotspotId + "," + durationNs + "," //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
 				+ (detail != null ? detail : "") + "\n"; //$NON-NLS-1$ //$NON-NLS-2$
 		QUEUE.add(line);
-		scheduleFlush();
 	}
 
 	/**
@@ -109,34 +130,45 @@ public final class RendererPerfTracer {
 	 * @param detail    short context string
 	 */
 	public static void count(String hotspotId, String detail) {
-		long wallMs = (System.nanoTime() - START_TIME) / 1_000_000L;
-		String line = wallMs + "," + hotspotId + ",0," //$NON-NLS-1$ //$NON-NLS-2$
+		long elapsedMs = (System.nanoTime() - START_TIME) / 1_000_000L;
+		String line = elapsedMs + "," + hotspotId + ",0," //$NON-NLS-1$ //$NON-NLS-2$
 				+ (detail != null ? detail : "") + "\n"; //$NON-NLS-1$ //$NON-NLS-2$
 		QUEUE.add(line);
-		scheduleFlush();
 	}
 
-	private static void scheduleFlush() {
-		if (FLUSH_SCHEDULED.compareAndSet(false, true)) {
-			Display display = Display.getDefault();
-			if (display != null && !display.isDisposed()) {
-				display.timerExec(500, RendererPerfTracer::flush);
-			} else {
-				flush();
+	private static void flush() {
+		synchronized (WRITER_LOCK) {
+			if (WRITER == null) {
+				return;
+			}
+			try {
+				String line;
+				while ((line = QUEUE.poll()) != null) {
+					WRITER.write(line);
+				}
+				WRITER.flush();
+			} catch (IOException e) {
+				// Silently drop. Tracing must not break the workbench.
 			}
 		}
 	}
 
-	private static void flush() {
-		FLUSH_SCHEDULED.set(false);
-		try (BufferedWriter writer = Files.newBufferedWriter(OUTPUT_FILE,
-				StandardOpenOption.CREATE, StandardOpenOption.APPEND)) {
-			String line;
-			while ((line = QUEUE.poll()) != null) {
-				writer.write(line);
+	private static void shutdown() {
+		FLUSHER.shutdown();
+		try {
+			FLUSHER.awaitTermination(1, TimeUnit.SECONDS);
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+		}
+		flush();
+		synchronized (WRITER_LOCK) {
+			if (WRITER != null) {
+				try {
+					WRITER.close();
+				} catch (IOException e) {
+					// ignore
+				}
 			}
-		} catch (IOException e) {
-			// Silently drop — tracing must not break the workbench
 		}
 	}
 }
