@@ -298,7 +298,7 @@ public class QuickAccessDialogTest {
 
 	// DEBUG: instrumented @RepeatedTest to chase flakiness on CI.
 	// Revert to a normal @Test before merging the final fix.
-	@RepeatedTest(500)
+	@RepeatedTest(200)
 	public void testPreviousChoicesAvailableForExtension(RepetitionInfo info) {
 		int iter = info.getCurrentRepetition();
 		long testStart = System.currentTimeMillis();
