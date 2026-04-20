@@ -26,12 +26,14 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Predicate;
 
 import org.eclipse.core.commands.Command;
+import org.eclipse.core.runtime.jobs.Job;
 import org.eclipse.jface.dialogs.DialogSettings;
 import org.eclipse.jface.dialogs.IDialogSettings;
 import org.eclipse.swt.SWT;
@@ -47,10 +49,13 @@ import org.eclipse.ui.handlers.IHandlerService;
 import org.eclipse.ui.ide.IDE;
 import org.eclipse.ui.internal.quickaccess.QuickAccessDialog;
 import org.eclipse.ui.internal.quickaccess.QuickAccessMessages;
+import org.eclipse.ui.internal.quickaccess.QuickAccessProvider;
 import org.eclipse.ui.tests.harness.util.CloseTestWindowsExtension;
 import org.eclipse.ui.tests.harness.util.DisplayHelper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.RepeatedTest;
+import org.junit.jupiter.api.RepetitionInfo;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
@@ -291,25 +296,161 @@ public class QuickAccessDialogTest {
 		processEventsUntil(() -> enterPressed.widget.isDisposed(), 500);
 	}
 
-	@Test
-	public void testPreviousChoicesAvailableForExtension() {
+	// DEBUG: instrumented @RepeatedTest to chase flakiness on CI.
+	// Revert to a normal @Test before merging the final fix.
+	@RepeatedTest(500)
+	public void testPreviousChoicesAvailableForExtension(RepetitionInfo info) {
+		int iter = info.getCurrentRepetition();
+		long testStart = System.currentTimeMillis();
+		debugLog(iter, "BEGIN test iteration");
+
 		// add one selection to history
 		QuickAccessDialog dialog = new TestQuickAccessDialog(activeWorkbenchWindow, null);
+		long openStart = System.currentTimeMillis();
 		dialog.open();
+		debugLog(iter, "first dialog.open took " + (System.currentTimeMillis() - openStart) + " ms");
+		debugLogProviders(iter, dialog);
+
 		Text text = dialog.getQuickAccessContents().getFilterText();
-		text.setText(TestQuickAccessComputer.TEST_QUICK_ACCESS_PROPOSAL_LABEL);
 		final Table firstTable = dialog.getQuickAccessContents().getTable();
-		assertTrue(DisplayHelper.waitForCondition(text.getDisplay(), TIMEOUT,
-				() -> dialogContains(dialog, TestQuickAccessComputer.TEST_QUICK_ACCESS_PROPOSAL_LABEL)));
+		long setTextStart = System.currentTimeMillis();
+		text.setText(TestQuickAccessComputer.TEST_QUICK_ACCESS_PROPOSAL_LABEL);
+		debugLog(iter, "setText returned after " + (System.currentTimeMillis() - setTextStart)
+				+ " ms, text.getText()=\"" + text.getText() + "\" itemCount=" + firstTable.getItemCount());
+
+		boolean firstOk = debugWaitForDialogContains(iter, "first", dialog, firstTable,
+				TestQuickAccessComputer.TEST_QUICK_ACCESS_PROPOSAL_LABEL);
+		if (!firstOk) {
+			debugDumpFailureState(iter, "first", dialog, firstTable);
+		}
+		assertTrue(firstOk,
+				"iter=" + iter + ": contributed item not in first dialog after " + TIMEOUT + " ms");
+
 		firstTable.select(0);
 		activateCurrentElement(dialog);
+
 		// then try in a new SearchField
 		QuickAccessDialog secondDialog = new TestQuickAccessDialog(activeWorkbenchWindow, null);
+		long open2Start = System.currentTimeMillis();
 		secondDialog.open();
-		assertTrue(DisplayHelper.waitForCondition(secondDialog.getShell().getDisplay(), TIMEOUT,
-						() -> getAllEntries(secondDialog.getQuickAccessContents().getTable()).stream()
-								.anyMatch(TestQuickAccessComputer::isContributedItem)),
-				"Contributed item not found in previous choices");
+		debugLog(iter, "second dialog.open took " + (System.currentTimeMillis() - open2Start) + " ms");
+		Table secondTable = secondDialog.getQuickAccessContents().getTable();
+
+		boolean secondOk = debugWaitForCondition(iter, "second", secondDialog, secondTable,
+				() -> getAllEntries(secondTable).stream().anyMatch(TestQuickAccessComputer::isContributedItem),
+				"previous-pick contributed item");
+		if (!secondOk) {
+			debugDumpFailureState(iter, "second", secondDialog, secondTable);
+		}
+		assertTrue(secondOk,
+				"iter=" + iter + ": contributed item not found in previous choices after " + TIMEOUT + " ms");
+
+		debugLog(iter, "END test iteration, total=" + (System.currentTimeMillis() - testStart) + " ms");
+	}
+
+	// DEBUG helpers below; remove together with the @RepeatedTest above.
+	private static void debugLog(int iter, String msg) {
+		System.err.println("[QADialogTest iter=" + iter + " t=" + System.currentTimeMillis() + "] " + msg);
+	}
+
+	private static void debugLogProviders(int iter, QuickAccessDialog dialog) {
+		QuickAccessProvider[] providers = dialog.getQuickAccessContents().debugGetProviders();
+		StringBuilder sb = new StringBuilder("providers(").append(providers.length).append("): ");
+		for (QuickAccessProvider p : providers) {
+			sb.append(p.getId()).append(",");
+		}
+		debugLog(iter, sb.toString());
+	}
+
+	private static String debugJobState(QuickAccessDialog dialog) {
+		Job j = dialog.getQuickAccessContents().debugGetComputeProposalsJob();
+		if (j == null) {
+			return "computeProposalsJob=null";
+		}
+		return "computeProposalsJob state=" + j.getState() + " result=" + j.getResult();
+	}
+
+	private boolean debugWaitForDialogContains(int iter, String tag, QuickAccessDialog dialog,
+			Table table, String needle) {
+		return debugWaitForCondition(iter, tag, dialog, table,
+				() -> dialogContains(dialog, needle), "label=\"" + needle + "\"");
+	}
+
+	private boolean debugWaitForCondition(int iter, String tag, QuickAccessDialog dialog, Table table,
+			java.util.function.BooleanSupplier cond, String what) {
+		long start = System.currentTimeMillis();
+		long deadline = start + TIMEOUT;
+		int pollCount = 0;
+		while (System.currentTimeMillis() < deadline) {
+			while (Display.getCurrent().readAndDispatch()) {
+				// pump
+			}
+			pollCount++;
+			boolean ok;
+			try {
+				ok = cond.getAsBoolean();
+			} catch (RuntimeException e) {
+				debugLog(iter, tag + " poll#" + pollCount + " threw " + e);
+				throw e;
+			}
+			if (pollCount == 1 || pollCount % 10 == 0 || ok) {
+				int cnt = (table != null && !table.isDisposed()) ? table.getItemCount() : -1;
+				debugLog(iter, tag + " poll#" + pollCount + " elapsed="
+						+ (System.currentTimeMillis() - start) + " ms cond=" + ok
+						+ " itemCount=" + cnt + " " + debugJobState(dialog));
+			}
+			if (ok) {
+				debugLog(iter, tag + " satisfied(" + what + ") after "
+						+ (System.currentTimeMillis() - start) + " ms, polls=" + pollCount);
+				return true;
+			}
+			try {
+				Thread.sleep(10);
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+				return false;
+			}
+		}
+		return false;
+	}
+
+	private void debugDumpFailureState(int iter, String tag, QuickAccessDialog dialog, Table table) {
+		debugLog(iter, "=== FAILURE DUMP (" + tag + ") ===");
+		debugLog(iter, debugJobState(dialog));
+		debugLogProviders(iter, dialog);
+		if (table != null && !table.isDisposed()) {
+			List<String> entries = getAllEntries(table);
+			debugLog(iter, "table entries (" + entries.size() + "):");
+			for (int i = 0; i < entries.size(); i++) {
+				debugLog(iter, "  [" + i + "] " + entries.get(i));
+			}
+		} else {
+			debugLog(iter, "table null or disposed: " + table);
+		}
+		Shell[] shells = Display.getDefault().getShells();
+		debugLog(iter, "shells(" + shells.length + "):");
+		for (Shell s : shells) {
+			debugLog(iter, "  shell text=\"" + s.getText() + "\" disposed=" + s.isDisposed()
+					+ " visible=" + (!s.isDisposed() && s.isVisible()));
+		}
+		Job[] runningJobs = Job.getJobManager().find(null);
+		debugLog(iter, "running jobs(" + runningJobs.length + "):");
+		for (Job j : runningJobs) {
+			debugLog(iter, "  job name=\"" + j.getName() + "\" state=" + j.getState()
+					+ " result=" + j.getResult());
+		}
+		Map<Thread, StackTraceElement[]> stacks = Thread.getAllStackTraces();
+		debugLog(iter, "thread dump (" + stacks.size() + " threads):");
+		for (Map.Entry<Thread, StackTraceElement[]> e : stacks.entrySet()) {
+			Thread t = e.getKey();
+			StringBuilder sb = new StringBuilder();
+			sb.append("  \"").append(t.getName()).append("\" state=").append(t.getState());
+			for (StackTraceElement frame : e.getValue()) {
+				sb.append("\n    at ").append(frame);
+			}
+			debugLog(iter, sb.toString());
+		}
+		debugLog(iter, "=== END FAILURE DUMP (" + tag + ") ===");
 	}
 
 	@Test

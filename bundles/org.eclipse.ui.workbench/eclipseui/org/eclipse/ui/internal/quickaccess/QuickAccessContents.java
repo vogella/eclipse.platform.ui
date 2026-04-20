@@ -128,6 +128,17 @@ public abstract class QuickAccessContents {
 		this.providers = providers;
 	}
 
+	// DEBUG: instrumentation for testPreviousChoicesAvailableForExtension flakiness.
+	// Remove before merging the fix.
+	public Job debugGetComputeProposalsJob() {
+		return computeProposalsJob;
+	}
+
+	// DEBUG: instrumentation. Remove before merging the fix.
+	public QuickAccessProvider[] debugGetProviders() {
+		return providers;
+	}
+
 	/**
 	 * Returns the number of items the table can fit in its current layout
 	 */
