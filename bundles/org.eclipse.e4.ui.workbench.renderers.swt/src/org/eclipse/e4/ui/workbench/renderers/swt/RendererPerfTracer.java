@@ -61,7 +61,8 @@ public final class RendererPerfTracer {
 	public static final String H06_MENU_SCHEDULE_UPDATE = "H06_menu_scheduleUpdate"; //$NON-NLS-1$
 	public static final String H07_MENU_CONTEXT_PER_ITEM = "H07_menu_contextPerItem"; //$NON-NLS-1$
 	public static final String H09_WBW_FIND_STACKS = "H09_wbw_findStacks"; //$NON-NLS-1$
-	public static final String H10_SHOW_TAB_NO_BATCH = "H10_showTab_noBatch"; //$NON-NLS-1$
+	public static final String H10A_SHOWTAB_LAZY = "H10a_showTab_lazyCreate"; //$NON-NLS-1$
+	public static final String H10B_SHOWTAB_REPARENT = "H10b_showTab_reparent"; //$NON-NLS-1$
 	public static final String H11_LIMBO_REPARENT = "H11_limbo_reparent"; //$NON-NLS-1$
 	public static final String H12_AREA_SYNCH_CTF = "H12_area_synchCTF"; //$NON-NLS-1$
 	public static final String H13_TOOLCTRL_STARTUP_SCAN = "H13_toolCtrl_startupScan"; //$NON-NLS-1$

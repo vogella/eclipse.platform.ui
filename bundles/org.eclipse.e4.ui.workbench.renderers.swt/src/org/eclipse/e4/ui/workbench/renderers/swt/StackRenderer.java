@@ -1501,10 +1501,11 @@ public class StackRenderer extends LazyStackRenderer {
 			tabItem = findItemForPart(element, element.getParent());
 		}
 		Control ctrl = (Control) element.getWidget();
+		boolean lazyCreate = (ctrl == null);
 		if (ctrl != null && ctrl.getParent() != tabFolder) {
 			ctrl.setParent(tabFolder);
 			tabItem.setControl(ctrl);
-		} else if (element.getWidget() == null) {
+		} else if (lazyCreate) {
 			Control tabCtrl = (Control) renderer.createGui(element);
 			tabItem.setControl(tabCtrl);
 		}
@@ -1523,8 +1524,8 @@ public class StackRenderer extends LazyStackRenderer {
 		// Show the new state
 		adjustTopRight(tabFolder);
 		if (RendererPerfTracer.ENABLED) {
-			RendererPerfTracer.trace(RendererPerfTracer.H10_SHOW_TAB_NO_BATCH, _t0,
-					element.getClass().getSimpleName());
+			String id = lazyCreate ? RendererPerfTracer.H10A_SHOWTAB_LAZY : RendererPerfTracer.H10B_SHOWTAB_REPARENT;
+			RendererPerfTracer.trace(id, _t0, element.getClass().getSimpleName());
 		}
 	}
 

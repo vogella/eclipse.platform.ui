@@ -58,7 +58,7 @@ for comparison.
 
 | Rank | Hotspot                                     |     Count | Total ms      | Max ms        | P95 ms | Verdict                            |
 |------|---------------------------------------------|----------:|--------------:|--------------:|-------:|------------------------------------|
-| 1    | H10 `showTab` without `setRedraw` batching  |    8 (9)  | **1,817** (1,566) | 1,209 (977) | 901    | Candidate fix on a separate branch, not yet measured here |
+| 1    | H10 `showTab` (now split into H10a lazy / H10b reparent) |    8 (9)  | **1,817** (1,566) | 1,209 (977) | 901    | Tail dominated by H10a cold first-show; `setRedraw` fix tried and reverted |
 | 2    | H07 per-item context creation in menu show  |  403 (227)| **954** (568) | 373 (262)   | 1.2    | Top unfixed priority (see caveat)  |
 | 3    | H03 unbatched `updateWidget` / `requestLayout` |  155 (115)| **25** (16)   | 6.3 (3.1)   | 0.76   | Low per call; new 6 ms spike       |
 | 4    | H05 `ToolItemUpdater` linear scan           |  309 (238)| **22** (17)   | 3.3 (3.4)   | 0.09   | Low; 12 items                       |
@@ -86,8 +86,8 @@ practice at current model sizes.
 
 - H07 moved closer to H10. Total time rose 68 percent (568 ms to 954 ms) with
   call count nearly doubling (227 to 403), consistent with heavier menu
-  interaction in Session 2. H07 is the dominant unfixed hotspot once the H10
-  candidate fix is validated.
+  interaction in Session 2. With the H10 `setRedraw` fix ruled out, H07 is
+  now the top actionable hotspot.
 - H03 showed a new 6 ms spike (up from 3.1 ms max). Still a low total (25 ms)
   but worth monitoring; could indicate layout cascading when multiple toolbar
   items update in quick succession.
@@ -113,16 +113,45 @@ synchronous `mgr.update(false)` walks per minute when batching is off.
 
 ## Fix Status
 
-### H10: `showTab` `setRedraw` batching
+### H10: `showTab` `setRedraw` batching (abandoned)
 
-**Candidate fix:** `wip-fix-showTab-setRedraw-batching` (commit `dcb99d75`)
+A candidate fix on `wip-fix-showTab-setRedraw-batching` wrapped the `showTab`
+body in `setRedraw(false)` and `setRedraw(true)` on the target `CTabFolder`.
+It was merged into an aggregator build and measured. Result: **the fix did
+not help and was reverted**.
 
-The candidate wraps the `showTab` body in `setRedraw(false)` and
-`setRedraw(true)` on the target `CTabFolder`. H10 was the number one hotspot
-in both sessions (1,566 ms and 1,817 ms total, worst single call 977 ms and
-1,209 ms). The fix is not part of this trace branch and has not been measured
-here. A third trace session with the fix merged is required to confirm the
-expected 80 to 95 percent reduction.
+| Metric            | No fix | Always batch | Reparent-only batch |
+|-------------------|-------:|-------------:|--------------------:|
+| Avg ms per call   | 24.6   | 34.0         | 54.2                |
+| P95 ms            | 124    | 99           | 137                 |
+| Max ms            | 695    | 1,087        | 1,462               |
+
+Why it did not work: the tail in every recorded session (max 695 ms to
+1,462 ms, P95 98 ms to 137 ms) is dominated by one or two very expensive
+calls per session. Those calls happen on the **lazy-create path** inside
+`showTab`, where `renderer.createGui(element)` constructs a new editor or
+view and its initial layout. `setRedraw(true)` on exit forces that paint to
+happen synchronously inside the method, which inflates worst-case time
+rather than reducing it. On the reparent path (switching to an already
+rendered tab) the common case is already in the single-digit ms range, so
+there is no meaningful time for batching to eliminate.
+
+### Revised instrumentation (this branch)
+
+Because the lazy-create path and the reparent path have different cost
+profiles and different causes, H10 has been split into two probes:
+
+- `H10a_showTab_lazyCreate`: `showTab` calls where `element.getWidget()`
+  is null and `renderer.createGui` is invoked. Expect a long right-tail
+  governed by editor/view construction cost.
+- `H10b_showTab_reparent`: `showTab` calls where the widget already
+  exists and is being reparented or reselected. Expect low single-digit ms
+  and stable P95.
+
+Next session should report the two probes separately. `H10a` is not
+actionable via `setRedraw` batching. `H10b` is the one to watch if we want
+evidence that batching might help steady-state switching (though the
+measurements so far suggest it does not).
 
 ---
 
