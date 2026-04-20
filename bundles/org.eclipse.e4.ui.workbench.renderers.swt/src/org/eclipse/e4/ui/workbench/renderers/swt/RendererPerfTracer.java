@@ -15,16 +15,25 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Lightweight performance tracer for renderer hotspots.
  * <p>
  * Output file defaults to {@code $HOME/renderer-perf-trace.csv} and can be
- * overridden with {@code -Declipse.renderer.perf.trace.file=<path>}.
+ * overridden with {@code -Declipse.renderer.perf.trace.file=<path>}. A
+ * companion summary file is written next to the CSV with suffix
+ * {@code .summary.txt} when the JVM shuts down.
  * <p>
  * The CSV format is:
  * {@code timestamp_ms,hotspot_id,duration_ns,detail}
@@ -32,7 +41,8 @@ import java.util.concurrent.TimeUnit;
  * Trace records are queued lock-free on the producer side and drained by a
  * single daemon flusher thread every 500 ms. The flusher holds one open
  * {@link BufferedWriter} for the lifetime of the JVM; a shutdown hook drains
- * the queue and closes the writer so the last events are not lost.
+ * the queue, writes the summary, and closes the writer so the last events
+ * are not lost.
  */
 public final class RendererPerfTracer {
 
@@ -59,7 +69,9 @@ public final class RendererPerfTracer {
 	public static final String W1_SASH_SYNC_LAYOUT = "W1_sash_syncLayout_win"; //$NON-NLS-1$
 
 	private static final ConcurrentLinkedQueue<String> QUEUE = new ConcurrentLinkedQueue<>();
+	private static final Map<String, HotspotStats> STATS = new ConcurrentHashMap<>();
 	private static final Path OUTPUT_FILE;
+	private static final Path SUMMARY_FILE;
 	private static final long START_TIME = System.nanoTime();
 	private static final Object WRITER_LOCK = new Object();
 	private static final BufferedWriter WRITER;
@@ -72,6 +84,7 @@ public final class RendererPerfTracer {
 		} else {
 			OUTPUT_FILE = Path.of(System.getProperty("user.home"), "renderer-perf-trace.csv"); //$NON-NLS-1$ //$NON-NLS-2$
 		}
+		SUMMARY_FILE = Path.of(OUTPUT_FILE.toString() + ".summary.txt"); //$NON-NLS-1$
 		BufferedWriter writer = null;
 		if (ENABLED) {
 			try {
@@ -121,6 +134,7 @@ public final class RendererPerfTracer {
 		String line = elapsedMs + "," + hotspotId + "," + durationNs + "," //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
 				+ (detail != null ? detail : "") + "\n"; //$NON-NLS-1$ //$NON-NLS-2$
 		QUEUE.add(line);
+		STATS.computeIfAbsent(hotspotId, k -> new HotspotStats()).recordTimed(durationNs);
 	}
 
 	/**
@@ -134,6 +148,7 @@ public final class RendererPerfTracer {
 		String line = elapsedMs + "," + hotspotId + ",0," //$NON-NLS-1$ //$NON-NLS-2$
 				+ (detail != null ? detail : "") + "\n"; //$NON-NLS-1$ //$NON-NLS-2$
 		QUEUE.add(line);
+		STATS.computeIfAbsent(hotspotId, k -> new HotspotStats()).recordCountOnly();
 	}
 
 	private static void flush() {
@@ -161,6 +176,7 @@ public final class RendererPerfTracer {
 			Thread.currentThread().interrupt();
 		}
 		flush();
+		writeSummary();
 		synchronized (WRITER_LOCK) {
 			if (WRITER != null) {
 				try {
@@ -169,6 +185,88 @@ public final class RendererPerfTracer {
 					// ignore
 				}
 			}
+		}
+	}
+
+	private static void writeSummary() {
+		long elapsedMs = (System.nanoTime() - START_TIME) / 1_000_000L;
+		double elapsedMin = elapsedMs / 60_000.0;
+		List<Map.Entry<String, HotspotStats>> entries = new ArrayList<>(STATS.entrySet());
+		entries.sort(Comparator.<Map.Entry<String, HotspotStats>>comparingLong(
+				e -> e.getValue().totalNanos.get()).reversed());
+
+		StringBuilder sb = new StringBuilder(4096);
+		sb.append("Renderer Performance Trace Summary\n"); //$NON-NLS-1$
+		sb.append("==================================\n\n"); //$NON-NLS-1$
+		sb.append(String.format("Session duration: %.2f s%n", elapsedMs / 1000.0)); //$NON-NLS-1$
+		long totalEvents = entries.stream().mapToLong(e -> e.getValue().count.get()).sum();
+		sb.append(String.format("Total events:     %d%n%n", totalEvents)); //$NON-NLS-1$
+
+		sb.append(String.format("%-36s %8s %10s %10s %10s %10s%n", //$NON-NLS-1$
+				"Hotspot", "Count", "Calls/min", "Total ms", "Max ms", "P95 ms")); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$ //$NON-NLS-4$ //$NON-NLS-5$ //$NON-NLS-6$
+		sb.append(String.format("%-36s %8s %10s %10s %10s %10s%n", //$NON-NLS-1$
+				"-------", "-----", "---------", "--------", "------", "------")); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$ //$NON-NLS-4$ //$NON-NLS-5$ //$NON-NLS-6$
+		for (Map.Entry<String, HotspotStats> e : entries) {
+			HotspotStats s = e.getValue();
+			long count = s.count.get();
+			double callsPerMin = elapsedMin > 0 ? count / elapsedMin : 0;
+			if (s.isCountOnly()) {
+				sb.append(String.format("%-36s %8d %10.1f %10s %10s %10s%n", //$NON-NLS-1$
+						e.getKey(), count, callsPerMin, "-", "-", "-")); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
+			} else {
+				double totalMs = s.totalNanos.get() / 1_000_000.0;
+				double maxMs = s.maxNanos.get() / 1_000_000.0;
+				double p95Ms = s.percentileNanos(95) / 1_000_000.0;
+				sb.append(String.format("%-36s %8d %10.1f %10.2f %10.2f %10.2f%n", //$NON-NLS-1$
+						e.getKey(), count, callsPerMin, totalMs, maxMs, p95Ms));
+			}
+		}
+		try {
+			Files.writeString(SUMMARY_FILE, sb.toString(),
+					StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+		} catch (IOException e) {
+			System.err.println("RendererPerfTracer: failed to write " + SUMMARY_FILE + ": " + e); //$NON-NLS-1$ //$NON-NLS-2$
+		}
+	}
+
+	private static final class HotspotStats {
+		final AtomicLong count = new AtomicLong();
+		final AtomicLong totalNanos = new AtomicLong();
+		final AtomicLong maxNanos = new AtomicLong();
+		final List<Long> durationsNanos = Collections.synchronizedList(new ArrayList<>());
+
+		void recordTimed(long nanos) {
+			count.incrementAndGet();
+			totalNanos.addAndGet(nanos);
+			maxNanos.accumulateAndGet(nanos, Math::max);
+			durationsNanos.add(nanos);
+		}
+
+		void recordCountOnly() {
+			count.incrementAndGet();
+		}
+
+		boolean isCountOnly() {
+			return durationsNanos.isEmpty() && count.get() > 0;
+		}
+
+		long percentileNanos(int percentile) {
+			List<Long> snapshot;
+			synchronized (durationsNanos) {
+				if (durationsNanos.isEmpty()) {
+					return 0;
+				}
+				snapshot = new ArrayList<>(durationsNanos);
+			}
+			Collections.sort(snapshot);
+			int idx = (int) Math.ceil(percentile / 100.0 * snapshot.size()) - 1;
+			if (idx < 0) {
+				idx = 0;
+			}
+			if (idx >= snapshot.size()) {
+				idx = snapshot.size() - 1;
+			}
+			return snapshot.get(idx);
 		}
 	}
 }
