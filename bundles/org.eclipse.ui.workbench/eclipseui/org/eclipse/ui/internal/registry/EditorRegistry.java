@@ -76,6 +76,7 @@ import org.eclipse.ui.internal.IWorkbenchGraphicConstants;
 import org.eclipse.ui.internal.WorkbenchImages;
 import org.eclipse.ui.internal.WorkbenchMessages;
 import org.eclipse.ui.internal.WorkbenchPlugin;
+import org.eclipse.e4.ui.internal.workbench.StartupTrace;
 import org.eclipse.ui.internal.editorsupport.ComponentSupport;
 import org.eclipse.ui.internal.misc.ExternalProgramImageDescriptor;
 import org.eclipse.ui.internal.misc.ProgramImageDescriptor;
@@ -610,14 +611,18 @@ public class EditorRegistry extends EventManager implements IEditorRegistry, IEx
 	 * overrides.
 	 */
 	private void initializeFromStorage() {
+		long tTotal = StartupTrace.begin();
 		typeEditorMappings = new EditorMap();
 		extensionImages = new HashMap<>();
 
 		// Get editors from the registry
+		long tRead = StartupTrace.begin();
 		EditorRegistryReader registryReader = new EditorRegistryReader();
 		registryReader.addEditors(this);
+		StartupTrace.record("EditorRegistry.initializeFromStorage/addEditors (registry read)", tRead); //$NON-NLS-1$
 		sortInternalEditors();
 		rebuildInternalEditorMap();
+		StartupTrace.record("EditorRegistry.initializeFromStorage (total)", tTotal); //$NON-NLS-1$
 
 		IPreferenceStore store = PlatformUI.getPreferenceStore();
 		String defaultEditors = store.getString(IPreferenceConstants.DEFAULT_EDITORS);

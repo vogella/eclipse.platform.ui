@@ -38,6 +38,7 @@ import org.eclipse.ui.ISharedImages;
 import org.eclipse.ui.IWorkbench;
 import org.eclipse.ui.activities.WorkbenchActivityHelper;
 import org.eclipse.ui.internal.IWorkbenchConstants;
+import org.eclipse.e4.ui.internal.workbench.StartupTrace;
 import org.eclipse.ui.internal.e4.compatibility.CompatibilityPart;
 import org.eclipse.ui.internal.menus.MenuHelper;
 import org.eclipse.ui.part.ViewPart;
@@ -88,6 +89,7 @@ public class ViewRegistry implements IViewRegistry {
 
 	@PostConstruct
 	void postConstruct() {
+		long tTotal = StartupTrace.begin();
 		IExtensionPoint point = extensionRegistry.getExtensionPoint("org.eclipse.ui.views"); //$NON-NLS-1$
 		for (IExtension extension : point.getExtensions()) {
 			// find the category first
@@ -110,6 +112,7 @@ public class ViewRegistry implements IViewRegistry {
 			categories.put(miscCategory.getId(), new ViewCategory(miscCategory.getId(), miscCategory.getLabel()));
 		}
 
+		long tPass2 = StartupTrace.begin();
 		for (IExtension extension : point.getExtensions()) {
 			for (IConfigurationElement element : extension.getConfigurationElements()) {
 				if (element.getName().equals(IWorkbenchRegistryConstants.TAG_VIEW)) {
@@ -120,6 +123,8 @@ public class ViewRegistry implements IViewRegistry {
 				}
 			}
 		}
+		StartupTrace.record("ViewRegistry.postConstruct/pass2 views", tPass2); //$NON-NLS-1$
+		StartupTrace.record("ViewRegistry.postConstruct (total)", tTotal); //$NON-NLS-1$
 	}
 
 	private void createDescriptor(IConfigurationElement element, boolean e4View) {

@@ -226,6 +226,7 @@ import org.eclipse.ui.internal.menus.FocusControlSourceProvider;
 import org.eclipse.ui.internal.menus.WorkbenchMenuService;
 import org.eclipse.ui.internal.misc.Policy;
 import org.eclipse.ui.internal.misc.StatusUtil;
+import org.eclipse.e4.ui.internal.workbench.StartupTrace;
 import org.eclipse.ui.internal.misc.UIStats;
 import org.eclipse.ui.internal.model.ContributionService;
 import org.eclipse.ui.internal.progress.ProgressManager;
@@ -579,6 +580,7 @@ public final class Workbench extends EventManager implements IWorkbench, org.ecl
 	 *         IWorkbench.restart}; other values reserved for future use
 	 */
 	public static int createAndRunWorkbench(final Display display, final WorkbenchAdvisor advisor) {
+		long tOuter = StartupTrace.begin();
 		final int[] returnCode = new int[1];
 		Realm.runWithDefault(DisplayRealm.getRealm(display), () -> {
 			boolean showProgress = PrefUtil.getAPIPreferenceStore()
@@ -592,7 +594,9 @@ public final class Workbench extends EventManager implements IWorkbench, org.ecl
 
 			System.setProperty(org.eclipse.e4.ui.workbench.IWorkbench.XMI_URI_ARG,
 					"org.eclipse.ui.workbench/LegacyIDE.e4xmi"); //$NON-NLS-1$
+			long tGetApp = StartupTrace.begin();
 			Object obj = getApplication(Platform.getCommandLineArgs());
+			StartupTrace.record("createAndRunWorkbench/getApplication", tGetApp); //$NON-NLS-1$
 
 			IPreferenceStore store = WorkbenchPlugin.getDefault().getPreferenceStore();
 			if (!store.isDefault(IPreferenceConstants.LAYOUT_DIRECTION)) {
@@ -600,13 +604,17 @@ public final class Workbench extends EventManager implements IWorkbench, org.ecl
 				Window.setDefaultOrientation(orientation);
 			}
 			if (obj instanceof E4Application e4app) {
+				long tE4Wb = StartupTrace.begin();
 				E4Workbench e4Workbench = e4app.createE4Workbench(getApplicationContext(), display);
+				StartupTrace.record("createAndRunWorkbench/E4Application.createE4Workbench", tE4Wb); //$NON-NLS-1$
 
 				MApplication appModel = e4Workbench.getApplication();
 				IEclipseContext context = e4Workbench.getContext();
 
 				// create the workbench instance
+				long tCtor = StartupTrace.begin();
 				Workbench workbench = new Workbench(display, advisor, appModel, context);
+				StartupTrace.record("createAndRunWorkbench/new Workbench(ctor)", tCtor); //$NON-NLS-1$
 
 				Dictionary<String, Object> properties = new Hashtable<>();
 				properties.put(Constants.SERVICE_RANKING, Integer.valueOf(Integer.MAX_VALUE - 1));
@@ -667,7 +675,9 @@ public final class Workbench extends EventManager implements IWorkbench, org.ecl
 
 				setSearchContribution(appModel, true);
 				// run the legacy workbench once
+				long tRunUI = StartupTrace.begin();
 				returnCode[0] = workbench.runUI();
+				StartupTrace.record("createAndRunWorkbench/workbench.runUI", tRunUI); //$NON-NLS-1$
 
 				if (AUTOSCALE_ADAPTATION.isMonitorSpecificScalingDisabledForIncompatibility()) {
 					display.asyncExec(() -> {
@@ -698,6 +708,7 @@ public final class Workbench extends EventManager implements IWorkbench, org.ecl
 				}
 			}
 		});
+		StartupTrace.record("createAndRunWorkbench (outer total)", tOuter); //$NON-NLS-1$
 		return returnCode[0];
 	}
 
@@ -760,6 +771,7 @@ public final class Workbench extends EventManager implements IWorkbench, org.ecl
 	 * @return the display
 	 */
 	public static Display createDisplay() {
+		long tTotal = StartupTrace.begin();
 		// setup the application name used by SWT to lookup resources on some platforms
 		String applicationName = System.getProperty("eclipse.appName", WorkbenchPlugin.getDefault().getAppName()); //$NON-NLS-1$
 		if (applicationName != null) {
@@ -769,6 +781,7 @@ public final class Workbench extends EventManager implements IWorkbench, org.ecl
 		AUTOSCALE_ADAPTATION.setRescaleAtRuntimePropertyFromPreference();
 
 		// create the display
+		long tNew = StartupTrace.begin();
 		Display newDisplay = Display.getCurrent();
 		if (newDisplay == null) {
 			if (Policy.DEBUG_SWT_GRAPHICS || Policy.DEBUG_SWT_DEBUG) {
@@ -784,6 +797,7 @@ public final class Workbench extends EventManager implements IWorkbench, org.ecl
 				newDisplay = new Display();
 			}
 		}
+		StartupTrace.record("Workbench.createDisplay/new Display", tNew); //$NON-NLS-1$
 
 		// workaround for 1GEZ9UR and 1GF07HN
 		newDisplay.setWarnings(false);
@@ -792,8 +806,11 @@ public final class Workbench extends EventManager implements IWorkbench, org.ecl
 		// than the JobManager.
 		Thread.currentThread().setPriority(Math.min(Thread.MAX_PRIORITY, Thread.NORM_PRIORITY + 1));
 
+		long tImg = StartupTrace.begin();
 		initializeImages();
+		StartupTrace.record("Workbench.createDisplay/initializeImages (window icons)", tImg); //$NON-NLS-1$
 
+		StartupTrace.record("Workbench.createDisplay (total)", tTotal); //$NON-NLS-1$
 		return newDisplay;
 	}
 
@@ -1724,6 +1741,7 @@ public final class Workbench extends EventManager implements IWorkbench, org.ecl
 	 * @return true if init succeeded.
 	 */
 	private boolean init() {
+		long tInit = StartupTrace.begin();
 		// setup debug mode if required.
 		if (WorkbenchPlugin.getDefault().isDebugging()) {
 			WorkbenchPlugin.DEBUG = true;
@@ -1751,7 +1769,9 @@ public final class Workbench extends EventManager implements IWorkbench, org.ecl
 
 		// Initialize the activity support.
 
+		long t = StartupTrace.begin();
 		activityHelper = ActivityPersistanceHelper.getInstance();
+		StartupTrace.record("Workbench.init/ActivityPersistanceHelper.getInstance", t); //$NON-NLS-1$
 		StartupThreading.runWithoutExceptions(new StartupRunnable() {
 
 			@Override
@@ -1767,8 +1787,12 @@ public final class Workbench extends EventManager implements IWorkbench, org.ecl
 				introDescriptor = (IntroDescriptor) introRegistry.getIntroForProduct(product.getId());
 			}
 		}
+		t = StartupTrace.begin();
 		initializeDefaultServices();
+		StartupTrace.record("Workbench.init/initializeDefaultServices", t); //$NON-NLS-1$
+		t = StartupTrace.begin();
 		initializeFonts();
+		StartupTrace.record("Workbench.init/initializeFonts", t); //$NON-NLS-1$
 		initializeApplicationColors();
 
 		// now that the workbench is sufficiently initialized, let the advisor
@@ -1777,7 +1801,9 @@ public final class Workbench extends EventManager implements IWorkbench, org.ecl
 
 			@Override
 			public void runWithException() {
+				long t2 = StartupTrace.begin();
 				advisor.internalBasicInitialize(getWorkbenchConfigurer());
+				StartupTrace.record("Workbench.init/advisor.internalBasicInitialize", t2); //$NON-NLS-1$
 			}
 		});
 
@@ -1804,26 +1830,36 @@ public final class Workbench extends EventManager implements IWorkbench, org.ecl
 		// attempt to restore a previous workbench state
 		try {
 			UIStats.start(UIStats.RESTORE_WORKBENCH, "Workbench"); //$NON-NLS-1$
+			long tRestore = StartupTrace.begin();
 
 			final boolean bail[] = new boolean[1];
 			StartupThreading.runWithoutExceptions(new StartupRunnable() {
 
 				@Override
 				public void runWithException() throws Throwable {
+					long t2 = StartupTrace.begin();
 					advisor.preStartup();
+					StartupTrace.record("Workbench.init/advisor.preStartup", t2); //$NON-NLS-1$
 					// TODO compat: open the windows here/instantiate the model
 					// TODO compat: instantiate the WW around the model
 					initializationDone = true;
-					if (isClosing() || !advisor.openWindows()) {
-						// if (isClosing()) {
+					if (isClosing()) {
 						bail[0] = true;
+					} else {
+						if (!advisor.openWindows()) {
+							bail[0] = true;
+						}
 					}
 
+					long t4 = StartupTrace.begin();
 					restoreWorkbenchState();
+					StartupTrace.record("Workbench.init/restoreWorkbenchState", t4); //$NON-NLS-1$
 				}
 			});
 
+			StartupTrace.record("Workbench.init/restore+openWindows (total)", tRestore); //$NON-NLS-1$
 			if (bail[0]) {
+				StartupTrace.record("Workbench.init (total, bailed)", tInit); //$NON-NLS-1$
 				return false;
 			}
 
@@ -1831,6 +1867,7 @@ public final class Workbench extends EventManager implements IWorkbench, org.ecl
 			UIStats.end(UIStats.RESTORE_WORKBENCH, this, "Workbench"); //$NON-NLS-1$
 		}
 
+		StartupTrace.record("Workbench.init (total)", tInit); //$NON-NLS-1$
 		return true;
 	}
 
@@ -2333,8 +2370,10 @@ public final class Workbench extends EventManager implements IWorkbench, org.ecl
 
 			@Override
 			public void runWithException() {
+				long t = StartupTrace.begin();
 				Command.DEBUG_COMMAND_EXECUTION = Policy.DEBUG_COMMANDS;
 				commandManager = e4Context.get(CommandManager.class);
+				StartupTrace.record("initializeDefaultServices/commandManager", t); //$NON-NLS-1$
 			}
 		});
 
@@ -2343,8 +2382,9 @@ public final class Workbench extends EventManager implements IWorkbench, org.ecl
 
 			@Override
 			public void runWithException() {
+				long t = StartupTrace.begin();
 				commandService[0] = initializeCommandService(e4Context);
-
+				StartupTrace.record("initializeDefaultServices/initializeCommandService", t); //$NON-NLS-1$
 			}
 		});
 
@@ -2352,12 +2392,16 @@ public final class Workbench extends EventManager implements IWorkbench, org.ecl
 
 			@Override
 			public void runWithException() {
+				long t = StartupTrace.begin();
 				ContextManager.DEBUG = Policy.DEBUG_CONTEXTS;
 				contextManager = e4Context.get(ContextManager.class);
+				StartupTrace.record("initializeDefaultServices/contextManager", t); //$NON-NLS-1$
 			}
 		});
 
+		long tCxs = StartupTrace.begin();
 		IContextService cxs = ContextInjectionFactory.make(ContextService.class, e4Context);
+		StartupTrace.record("initializeDefaultServices/ContextService.make", tCxs); //$NON-NLS-1$
 
 		final IContextService contextService = cxs;
 
@@ -2365,6 +2409,7 @@ public final class Workbench extends EventManager implements IWorkbench, org.ecl
 
 			@Override
 			public void runWithException() {
+				long t = StartupTrace.begin();
 				contextManager.addContextManagerListener(contextManagerEvent -> {
 					if (contextManagerEvent.isContextChanged()) {
 						String id = contextManagerEvent.getContextId();
@@ -2375,6 +2420,7 @@ public final class Workbench extends EventManager implements IWorkbench, org.ecl
 				});
 				EContextService ecs = e4Context.get(EContextService.class);
 				ecs.activateContext(IContextService.CONTEXT_ID_DIALOG_AND_WINDOW);
+				StartupTrace.record("initializeDefaultServices/contextManager listener+activate", t); //$NON-NLS-1$
 			}
 		});
 
@@ -2386,21 +2432,27 @@ public final class Workbench extends EventManager implements IWorkbench, org.ecl
 
 			@Override
 			public void runWithException() {
+				long t = StartupTrace.begin();
 				BindingManager.DEBUG = Policy.DEBUG_KEY_BINDINGS;
 				bindingManager = e4Context.get(BindingManager.class);
 				bindingService[0] = ContextInjectionFactory.make(BindingService.class, e4Context);
+				StartupTrace.record("initializeDefaultServices/bindingManager+bindingService", t); //$NON-NLS-1$
 			}
 		});
 
 		// bindingService[0].readRegistryAndPreferences(commandService[0]);
 		serviceLocator.registerService(IBindingService.class, bindingService[0]);
 
+		long tCmdImg = StartupTrace.begin();
 		final CommandImageManager commandImageManager = new CommandImageManager();
 		final CommandImageService commandImageService = new CommandImageService(commandImageManager, commandService[0]);
 		commandImageService.readRegistry();
+		StartupTrace.record("initializeDefaultServices/commandImageService.readRegistry", tCmdImg); //$NON-NLS-1$
 		serviceLocator.registerService(ICommandImageService.class, commandImageService);
 
+		long tMenuCtor = StartupTrace.begin();
 		final WorkbenchMenuService menuService = new WorkbenchMenuService(serviceLocator, e4Context);
+		StartupTrace.record("initializeDefaultServices/new WorkbenchMenuService", tMenuCtor); //$NON-NLS-1$
 
 		serviceLocator.registerService(IMenuService.class, menuService);
 		// the service must be registered before it is initialized - its
@@ -2410,7 +2462,9 @@ public final class Workbench extends EventManager implements IWorkbench, org.ecl
 
 			@Override
 			public void runWithException() {
+				long t = StartupTrace.begin();
 				menuService.readRegistry();
+				StartupTrace.record("initializeDefaultServices/menuService.readRegistry", t); //$NON-NLS-1$
 			}
 		});
 
@@ -2427,7 +2481,10 @@ public final class Workbench extends EventManager implements IWorkbench, org.ecl
 			@Override
 			public void runWithException() {
 				// this currently instantiates all players ... sigh
+				long tRead = StartupTrace.begin();
 				sourceProviderService.readRegistry();
+				StartupTrace.record("initializeDefaultServices/sourceProviderService.readRegistry", tRead); //$NON-NLS-1$
+				long tAdd = StartupTrace.begin();
 				ISourceProvider[] sourceproviders = sourceProviderService.getSourceProviders();
 				for (ISourceProvider sp : sourceproviders) {
 					evaluationService.addSourceProvider(sp);
@@ -2435,6 +2492,7 @@ public final class Workbench extends EventManager implements IWorkbench, org.ecl
 						contextService.addSourceProvider(sp);
 					}
 				}
+				StartupTrace.record("initializeDefaultServices/register source providers", tAdd); //$NON-NLS-1$
 			}
 		});
 
@@ -2464,13 +2522,17 @@ public final class Workbench extends EventManager implements IWorkbench, org.ecl
 
 			@Override
 			public void runWithException() {
+				long t = StartupTrace.begin();
 				handlerService[0] = new LegacyHandlerService(e4Context);
 				e4Context.set(IHandlerService.class, handlerService[0]);
 				handlerService[0].readRegistry();
+				StartupTrace.record("initializeDefaultServices/handlerService.readRegistry", t); //$NON-NLS-1$
 			}
 		});
 		workbenchContextSupport = new WorkbenchContextSupport(this, contextManager);
+		long tCmdResolver = StartupTrace.begin();
 		initializeCommandResolver();
+		StartupTrace.record("initializeDefaultServices/initializeCommandResolver", tCmdResolver); //$NON-NLS-1$
 
 		bindingManager.addBindingManagerListener(bindingManagerListener);
 

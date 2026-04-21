@@ -64,6 +64,7 @@ import org.eclipse.e4.ui.internal.workbench.ReflectionContributionFactory;
 import org.eclipse.e4.ui.internal.workbench.ResourceHandler;
 import org.eclipse.e4.ui.internal.workbench.SelectionAggregator;
 import org.eclipse.e4.ui.internal.workbench.SelectionServiceImpl;
+import org.eclipse.e4.ui.internal.workbench.StartupTrace;
 import org.eclipse.e4.ui.internal.workbench.URIHelper;
 import org.eclipse.e4.ui.internal.workbench.WorkbenchLogger;
 import org.eclipse.e4.ui.model.application.MAddon;
@@ -140,6 +141,7 @@ public class E4Application implements IApplication {
 
 	@Override
 	public Object start(IApplicationContext applicationContext) throws Exception {
+		long tStart = StartupTrace.begin();
 		// set the display name before the Display is
 		// created to ensure the app name is used in any
 		// platform menus, etc. See
@@ -148,7 +150,9 @@ public class E4Application implements IApplication {
 		if (product != null && product.getName() != null) {
 			Display.setAppName(product.getName());
 		}
+		long tDisp = StartupTrace.begin();
 		Display display = getApplicationDisplay();
+		StartupTrace.record("E4Application.start/getApplicationDisplay", tDisp); //$NON-NLS-1$
 		Location instanceLocation = null;
 		try {
 			E4Workbench workbench = createE4Workbench(applicationContext, display);
@@ -160,11 +164,15 @@ public class E4Application implements IApplication {
 				// place it off so it's not visible
 				shell.setLocation(0, 10000);
 			}
-			if (!checkInstanceLocation(instanceLocation, shell, workbench.getContext())) {
+			long tCheck = StartupTrace.begin();
+			boolean ok = checkInstanceLocation(instanceLocation, shell, workbench.getContext());
+			StartupTrace.record("E4Application.start/checkInstanceLocation", tCheck); //$NON-NLS-1$
+			if (!ok) {
 				return EXIT_OK;
 			}
 
 			// Create and run the UI (if any)
+			StartupTrace.record("E4Application.start (pre-createAndRunUI)", tStart); //$NON-NLS-1$
 			workbench.createAndRunUI(workbench.getApplication());
 
 			saveModel();
@@ -210,9 +218,12 @@ public class E4Application implements IApplication {
 	}
 
 	public E4Workbench createE4Workbench(IApplicationContext applicationContext, final Display display) {
+		long tTotal = StartupTrace.begin();
 		args = (String[]) applicationContext.getArguments().get(IApplicationContext.APPLICATION_ARGS);
 
+		long tCtx = StartupTrace.begin();
 		IEclipseContext appContext = createDefaultContext();
+		StartupTrace.record("E4Application.createE4Workbench/createDefaultContext", tCtx); //$NON-NLS-1$
 		appContext.set(Display.class, display);
 		appContext.set(Realm.class, DisplayRealm.getRealm(display));
 		appContext.set(UISynchronize.class, new DisplayUISynchronize(display));
@@ -227,6 +238,7 @@ public class E4Application implements IApplication {
 
 		// Install the life-cycle manager for this session if there's one
 		// defined
+		long tLc = StartupTrace.begin();
 		Optional<String> lifeCycleURI = getArgValue(IWorkbench.LIFE_CYCLE_URI_ARG, applicationContext, false);
 		lifeCycleURI.ifPresent(lifeCycleURIValue -> {
 			lcManager = factory.create(lifeCycleURIValue, appContext);
@@ -235,6 +247,7 @@ public class E4Application implements IApplication {
 				ContextInjectionFactory.invoke(lcManager, PostContextCreate.class, appContext, null);
 			}
 		});
+		StartupTrace.record("E4Application.createE4Workbench/lifecycle manager (PostContextCreate)", tLc); //$NON-NLS-1$
 
 		Optional<String> forcedPerspectiveId = getArgValue(PERSPECTIVE_ARG_NAME, applicationContext, false);
 		forcedPerspectiveId.ifPresent(forcedPerspectiveIdValue -> appContext.set(E4Workbench.FORCED_PERSPECTIVE_ID,
@@ -246,7 +259,9 @@ public class E4Application implements IApplication {
 		}
 
 		// Create the app model and its context
+		long tModel = StartupTrace.begin();
 		MApplication appModel = loadApplicationModel(applicationContext, appContext);
+		StartupTrace.record("E4Application.createE4Workbench/loadApplicationModel", tModel); //$NON-NLS-1$
 		appModel.setContext(appContext);
 
 		boolean isRtl = ((Window.getDefaultOrientation() & SWT.RIGHT_TO_LEFT) != 0);
@@ -263,21 +278,27 @@ public class E4Application implements IApplication {
 		appContext.set(MApplication.class, appModel);
 
 		// adds basic services to the contexts
+		long tSvc = StartupTrace.begin();
 		initializeServices(appModel);
+		StartupTrace.record("E4Application.createE4Workbench/initializeServices", tSvc); //$NON-NLS-1$
 
 		// let the life cycle manager add to the model
 		if (lcManager != null) {
+			long tLc2 = StartupTrace.begin();
 			ContextInjectionFactory.invoke(lcManager, ProcessAdditions.class, appContext, null);
 			ContextInjectionFactory.invoke(lcManager, ProcessRemovals.class, appContext, null);
+			StartupTrace.record("E4Application.createE4Workbench/lifecycle ProcessAdditions+Removals", tLc2); //$NON-NLS-1$
 		}
 
 		// Create the addons
+		long tAddons = StartupTrace.begin();
 		IEclipseContext addonStaticContext = EclipseContextFactory.create();
 		for (MAddon addon : appModel.getAddons()) {
 			addonStaticContext.set(MAddon.class, addon);
 			Object obj = factory.create(addon.getContributionURI(), appContext, addonStaticContext);
 			addon.setObject(obj);
 		}
+		StartupTrace.record("E4Application.createE4Workbench/create addons", tAddons); //$NON-NLS-1$
 
 		// Parse out parameters from both the command line and/or the product
 		// definition (if any) and put them in the context
@@ -287,7 +308,9 @@ public class E4Application implements IApplication {
 		});
 
 
+		long tCss = StartupTrace.begin();
 		setCSSContextVariables(applicationContext, appContext);
+		StartupTrace.record("E4Application.createE4Workbench/setCSSContextVariables", tCss); //$NON-NLS-1$
 
 		Optional<String> rendererFactoryURI = getArgValue(E4Workbench.RENDERER_FACTORY_URI, applicationContext, false);
 		rendererFactoryURI.ifPresent(rendererFactoryURIValue -> {
@@ -300,7 +323,11 @@ public class E4Application implements IApplication {
 
 		// Instantiate the Workbench (which is responsible for
 		// 'running' the UI (if any)...
-		return workbench = new E4Workbench(appModel, appContext);
+		long tCtor = StartupTrace.begin();
+		E4Workbench wb = new E4Workbench(appModel, appContext);
+		StartupTrace.record("E4Application.createE4Workbench/new E4Workbench(ctor)", tCtor); //$NON-NLS-1$
+		StartupTrace.record("E4Application.createE4Workbench (total)", tTotal); //$NON-NLS-1$
+		return workbench = wb;
 	}
 
 	private void setCSSContextVariables(IApplicationContext applicationContext, IEclipseContext context) {
@@ -378,10 +405,14 @@ public class E4Application implements IApplication {
 
 		IContributionFactory factory = eclipseContext.get(IContributionFactory.class);
 
+		long tHandler = StartupTrace.begin();
 		handler = (IModelResourceHandler) factory.create(resourceHandler, eclipseContext);
+		StartupTrace.record("loadApplicationModel/create IModelResourceHandler", tHandler); //$NON-NLS-1$
 		eclipseContext.set(IModelResourceHandler.class, handler);
 
+		long tLoad = StartupTrace.begin();
 		Resource resource = handler.loadMostRecentModel();
+		StartupTrace.record("loadApplicationModel/handler.loadMostRecentModel (XMI parse)", tLoad); //$NON-NLS-1$
 		return (MApplication) resource.getContents().get(0);
 	}
 
