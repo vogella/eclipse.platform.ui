@@ -552,7 +552,8 @@ public class E4Application implements IApplication {
 		StartupTrace.record("createDefaultContext/EclipseContextFactory.create", tCreate); //$NON-NLS-1$
 
 		long tCore = StartupTrace.begin();
-		long[] cifAccum = CIF_ACCUM.get();
+		long coreCifNs = 0L;
+		int coreCifCount = 0;
 		IExtensionRegistry registry = RegistryFactory.getRegistry();
 		ExceptionHandler exceptionHandler = new ExceptionHandler();
 		serviceContext.set(IContributionFactory.class, new ReflectionContributionFactory());
@@ -561,52 +562,48 @@ public class E4Application implements IApplication {
 
 		long tCif1 = StartupTrace.begin();
 		EclipseAdapter adapter = ContextInjectionFactory.make(EclipseAdapter.class, serviceContext);
-		cifAccum[0] += System.nanoTime() - tCif1;
-		cifAccum[1]++;
+		coreCifNs += System.nanoTime() - tCif1;
+		coreCifCount++;
 		serviceContext.set(Adapter.class, adapter);
 
 		// No default log provider available
 		if (serviceContext.get(ILoggerProvider.class) == null) {
 			long tCif2 = StartupTrace.begin();
 			DefaultLoggerProvider loggerProvider = ContextInjectionFactory.make(DefaultLoggerProvider.class, serviceContext);
-			cifAccum[0] += System.nanoTime() - tCif2;
-			cifAccum[1]++;
+			coreCifNs += System.nanoTime() - tCif2;
+			coreCifCount++;
 			serviceContext.set(ILoggerProvider.class, loggerProvider);
 		}
+		StartupTrace.record(
+				"createDefaultContext/register core services/ContextInjectionFactory.make (count=" + coreCifCount + ")", //$NON-NLS-1$ //$NON-NLS-2$
+				System.nanoTime() - coreCifNs);
 		StartupTrace.record("createDefaultContext/register core services", tCore); //$NON-NLS-1$
 
 		return serviceContext;
 	}
 
-	// Thread-local accumulator used during createDefaultContext to sum the
-	// duration of the interleaved ContextInjectionFactory.make calls so a
-	// single aggregate span can be emitted with a count suffix.
-	private static final ThreadLocal<long[]> CIF_ACCUM = ThreadLocal.withInitial(() -> new long[2]);
-
 	// TODO This should go into a different bundle
 	public static IEclipseContext createDefaultContext() {
-
-		long[] cifAccum = CIF_ACCUM.get();
-		cifAccum[0] = 0L;
-		cifAccum[1] = 0L;
 
 		IEclipseContext serviceContext = createDefaultHeadlessContext();
 
 		long tUi = StartupTrace.begin();
+		long uiCifNs = 0L;
+		int uiCifCount = 0;
 		final IEclipseContext appContext = serviceContext.createChild("WorkbenchContext"); //$NON-NLS-1$
 		// make application context available for dependency injection under the E4Application.APPLICATION_CONTEXT_KEY key
 		appContext.set(IWorkbench.APPLICATION_CONTEXT_KEY, appContext);
 
 		long tCif3 = StartupTrace.begin();
 		WorkbenchLogger logger = ContextInjectionFactory.make(WorkbenchLogger.class, appContext);
-		cifAccum[0] += System.nanoTime() - tCif3;
-		cifAccum[1]++;
+		uiCifNs += System.nanoTime() - tCif3;
+		uiCifCount++;
 		appContext.set(Logger.class, logger);
 
 		long tCif4 = StartupTrace.begin();
 		ModelServiceImpl modelService = ContextInjectionFactory.make(ModelServiceImpl.class, appContext);
-		cifAccum[0] += System.nanoTime() - tCif4;
-		cifAccum[1]++;
+		uiCifNs += System.nanoTime() - tCif4;
+		uiCifCount++;
 		appContext.set(EModelService.class, modelService);
 		appContext.set(EPlaceholderResolver.class, new PlaceholderResolver());
 
@@ -641,12 +638,10 @@ public class E4Application implements IApplication {
 
 		// translation
 		initializeLocalization(appContext);
+		StartupTrace.record(
+				"createDefaultContext/register UI services/ContextInjectionFactory.make (count=" + uiCifCount + ")", //$NON-NLS-1$ //$NON-NLS-2$
+				System.nanoTime() - uiCifNs);
 		StartupTrace.record("createDefaultContext/register UI services", tUi); //$NON-NLS-1$
-
-		long cifTotalNs = cifAccum[0];
-		long cifCount = cifAccum[1];
-		long fakeStart = System.nanoTime() - cifTotalNs;
-		StartupTrace.record("createDefaultContext/ContextInjectionFactory.make (count=" + cifCount + ")", fakeStart); //$NON-NLS-1$ //$NON-NLS-2$
 
 		return appContext;
 	}
