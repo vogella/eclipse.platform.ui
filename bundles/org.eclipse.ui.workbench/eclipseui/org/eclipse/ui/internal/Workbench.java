@@ -691,6 +691,8 @@ public final class Workbench extends EventManager implements IWorkbench, org.ecl
 					if (serviceListener.get() != null) {
 						WorkbenchPlugin.getDefault().getBundleContext().removeServiceListener(serviceListener.get());
 					}
+					StartupTrace.mark("startup.complete (marker)"); //$NON-NLS-1$
+					scheduleStartupTraceAutoExit(display);
 					e4Workbench.createAndRunUI(e4Workbench.getApplication());
 				}
 				if (returnCode[0] != PlatformUI.RETURN_UNSTARTABLE) {
@@ -710,6 +712,34 @@ public final class Workbench extends EventManager implements IWorkbench, org.ecl
 		});
 		StartupTrace.record("createAndRunWorkbench (outer total)", tOuter); //$NON-NLS-1$
 		return returnCode[0];
+	}
+
+	/**
+	 * If the {@code startup.trace.autoExitSeconds} system property is set to a
+	 * positive integer, schedule a graceful workbench close after that many
+	 * seconds. Used for unattended batch collection of startup traces; no-op
+	 * if the property is unset or invalid.
+	 */
+	private static void scheduleStartupTraceAutoExit(Display display) {
+		String raw = System.getProperty("startup.trace.autoExitSeconds"); //$NON-NLS-1$
+		if (raw == null) {
+			return;
+		}
+		int seconds;
+		try {
+			seconds = Integer.parseInt(raw.trim());
+		} catch (NumberFormatException ignored) {
+			return;
+		}
+		if (seconds <= 0) {
+			return;
+		}
+		display.timerExec(seconds * 1000, () -> {
+			if (!PlatformUI.getWorkbench().isClosing()) {
+				PlatformUI.getWorkbench().close();
+			}
+		});
+		System.err.println("[StartupTrace] auto-exit scheduled in " + seconds + "s"); //$NON-NLS-1$ //$NON-NLS-2$
 	}
 
 	private static void setSearchContribution(MApplication app, boolean enabled) {
