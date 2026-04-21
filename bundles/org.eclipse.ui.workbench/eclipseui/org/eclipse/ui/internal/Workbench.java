@@ -226,7 +226,7 @@ import org.eclipse.ui.internal.menus.FocusControlSourceProvider;
 import org.eclipse.ui.internal.menus.WorkbenchMenuService;
 import org.eclipse.ui.internal.misc.Policy;
 import org.eclipse.ui.internal.misc.StatusUtil;
-import org.eclipse.e4.ui.internal.workbench.StartupTrace;
+import org.eclipse.core.internal.runtime.StartupTrace;
 import org.eclipse.ui.internal.misc.UIStats;
 import org.eclipse.ui.internal.model.ContributionService;
 import org.eclipse.ui.internal.progress.ProgressManager;

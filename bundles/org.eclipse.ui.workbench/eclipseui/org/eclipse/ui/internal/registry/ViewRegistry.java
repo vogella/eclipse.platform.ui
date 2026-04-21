@@ -38,7 +38,7 @@ import org.eclipse.ui.ISharedImages;
 import org.eclipse.ui.IWorkbench;
 import org.eclipse.ui.activities.WorkbenchActivityHelper;
 import org.eclipse.ui.internal.IWorkbenchConstants;
-import org.eclipse.e4.ui.internal.workbench.StartupTrace;
+import org.eclipse.core.internal.runtime.StartupTrace;
 import org.eclipse.ui.internal.e4.compatibility.CompatibilityPart;
 import org.eclipse.ui.internal.menus.MenuHelper;
 import org.eclipse.ui.part.ViewPart;

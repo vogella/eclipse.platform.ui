@@ -58,7 +58,7 @@ import org.eclipse.ui.internal.help.CommandHelpServiceImpl;
 import org.eclipse.ui.internal.help.HelpServiceImpl;
 import org.eclipse.ui.internal.intro.IIntroRegistry;
 import org.eclipse.ui.internal.intro.IntroRegistry;
-import org.eclipse.e4.ui.internal.workbench.StartupTrace;
+import org.eclipse.core.internal.runtime.StartupTrace;
 import org.eclipse.ui.internal.misc.StatusUtil;
 import org.eclipse.ui.internal.operations.WorkbenchOperationSupport;
 import org.eclipse.ui.internal.progress.ProgressManager;
