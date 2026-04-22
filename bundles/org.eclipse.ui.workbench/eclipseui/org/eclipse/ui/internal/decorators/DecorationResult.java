@@ -14,7 +14,6 @@
 package org.eclipse.ui.internal.decorators;
 
 import java.util.List;
-import java.util.ListIterator;
 
 import org.eclipse.jface.resource.ImageDescriptor;
 import org.eclipse.jface.resource.ResourceManager;
@@ -30,9 +29,9 @@ import org.eclipse.swt.graphics.Rectangle;
  */
 public class DecorationResult {
 
-	private final List prefixes;
+	private final List<String> prefixes;
 
-	private final List suffixes;
+	private final List<String> suffixes;
 
 	private ImageDescriptor[] descriptors;
 
@@ -42,8 +41,8 @@ public class DecorationResult {
 
 	private final Font font;
 
-	DecorationResult(List prefixList, List suffixList, ImageDescriptor[] imageDescriptors, Color resultForegroundColor,
-			Color resultBackgroundColor, Font resultFont) {
+	DecorationResult(List<String> prefixList, List<String> suffixList, ImageDescriptor[] imageDescriptors,
+			Color resultForegroundColor, Color resultBackgroundColor, Font resultFont) {
 		prefixes = prefixList;
 		suffixes = suffixList;
 
@@ -103,18 +102,14 @@ public class DecorationResult {
 
 		StringBuilder result = new StringBuilder();
 
-		ListIterator prefixIterator = prefixes.listIterator();
-
-		while (prefixIterator.hasNext()) {
-			result.append(prefixIterator.next());
+		for (String prefix : prefixes) {
+			result.append(prefix);
 		}
 
 		result.append(text);
 
-		ListIterator suffixIterator = suffixes.listIterator();
-
-		while (suffixIterator.hasNext()) {
-			result.append(suffixIterator.next());
+		for (String suffix : suffixes) {
+			result.append(suffix);
 		}
 
 		return result.toString();
@@ -134,7 +129,7 @@ public class DecorationResult {
 	 *
 	 * @return List
 	 */
-	List getPrefixes() {
+	List<String> getPrefixes() {
 		return prefixes;
 	}
 
@@ -143,7 +138,7 @@ public class DecorationResult {
 	 *
 	 * @return List
 	 */
-	List getSuffixes() {
+	List<String> getSuffixes() {
 		return suffixes;
 	}
 

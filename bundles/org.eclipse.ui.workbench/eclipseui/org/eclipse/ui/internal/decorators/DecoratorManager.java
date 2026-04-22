@@ -16,9 +16,7 @@ package org.eclipse.ui.internal.decorators;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.Set;
-import java.util.StringTokenizer;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IConfigurationElement;
 import org.eclipse.core.runtime.IExtension;
@@ -236,10 +234,8 @@ public class DecoratorManager implements ILabelProviderListener, IDecoratorManag
 
 		ArrayList<DecoratorDefinition> full = new ArrayList<>();
 		ArrayList<DecoratorDefinition> lightweight = new ArrayList<>();
-		Iterator<DecoratorDefinition> allDefinitions = values.iterator();
 		IExtensionTracker configurationElementTracker = PlatformUI.getWorkbench().getExtensionTracker();
-		while (allDefinitions.hasNext()) {
-			DecoratorDefinition nextDefinition = allDefinitions.next();
+		for (DecoratorDefinition nextDefinition : values) {
 			if (nextDefinition.isFull()) {
 				full.add(nextDefinition);
 			} else {
@@ -250,12 +246,10 @@ public class DecoratorManager implements ILabelProviderListener, IDecoratorManag
 					nextDefinition, IExtensionTracker.REF_WEAK);
 		}
 
-		fullDefinitions = new FullDecoratorDefinition[full.size()];
-		full.toArray(fullDefinitions);
+		fullDefinitions = full.toArray(new FullDecoratorDefinition[0]);
 
-		LightweightDecoratorDefinition[] lightweightDefinitions = new LightweightDecoratorDefinition[lightweight
-				.size()];
-		lightweight.toArray(lightweightDefinitions);
+		LightweightDecoratorDefinition[] lightweightDefinitions = lightweight
+				.toArray(new LightweightDecoratorDefinition[0]);
 
 		lightweightManager = new LightweightDecoratorManager(lightweightDefinitions);
 
@@ -699,14 +693,16 @@ public class DecoratorManager implements ILabelProviderListener, IDecoratorManag
 		String preferenceValue = WorkbenchPlugin.getDefault().getPreferenceStore()
 				.getString(IPreferenceConstants.ENABLED_DECORATORS);
 
-		StringTokenizer tokenizer = new StringTokenizer(preferenceValue, PREFERENCE_SEPARATOR);
 		Set<String> enabledIds = new HashSet<>();
 		Set<String> disabledIds = new HashSet<>();
-		while (tokenizer.hasMoreTokens()) {
-			String nextValuePair = tokenizer.nextToken();
-
-			// Strip out the true or false to get the id
-			String id = nextValuePair.substring(0, nextValuePair.indexOf(VALUE_SEPARATOR));
+		for (String nextValuePair : preferenceValue.split(PREFERENCE_SEPARATOR)) {
+			// Skip empty tokens (leading or consecutive separators) and
+			// malformed entries without a VALUE_SEPARATOR.
+			int separatorIndex = nextValuePair.indexOf(VALUE_SEPARATOR);
+			if (separatorIndex == -1) {
+				continue;
+			}
+			String id = nextValuePair.substring(0, separatorIndex);
 			if (nextValuePair.endsWith(P_TRUE)) {
 				enabledIds.add(id);
 			} else {
