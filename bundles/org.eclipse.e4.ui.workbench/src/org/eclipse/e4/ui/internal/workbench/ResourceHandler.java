@@ -31,6 +31,7 @@ import java.net.URLConnection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import org.eclipse.core.internal.runtime.StartupTrace;
 import org.eclipse.core.runtime.URIUtil;
 import org.eclipse.e4.core.contexts.ContextInjectionFactory;
 import org.eclipse.e4.core.contexts.IEclipseContext;
@@ -139,6 +140,7 @@ public class ResourceHandler implements IModelResourceHandler {
 
 	@Override
 	public Resource loadMostRecentModel() {
+		long tResolve = StartupTrace.begin();
 		File workbenchData = null;
 		URI restoreLocation = null;
 
@@ -160,10 +162,13 @@ public class ResourceHandler implements IModelResourceHandler {
 		// boolean restore = restoreLastModified > lastApplicationModification;
 		boolean restore = restoreLastModified > 0;
 		boolean initialModel;
+		StartupTrace.record("handler.loadMostRecentModel/resolve applicationXMI URI", tResolve); //$NON-NLS-1$
 
 		resource = null;
 		if (restore && saveAndRestore) {
-			resource = loadResource(restoreLocation);
+			long tDeltas = StartupTrace.begin();
+			resource = loadResource(restoreLocation, "handler.loadMostRecentModel/merge deltas"); //$NON-NLS-1$
+			StartupTrace.record("handler.loadMostRecentModel/merge deltas (if persisted state exists)", tDeltas); //$NON-NLS-1$
 			// If the saved model does not have any top-level windows, Eclipse will exit
 			// immediately, so throw out the persisted state and reinitialize with the defaults.
 			if (!hasTopLevelWindows(resource)) {
@@ -175,7 +180,9 @@ public class ResourceHandler implements IModelResourceHandler {
 			}
 		}
 		if (resource == null) {
-			Resource applicationResource = loadResource(applicationDefinitionInstance);
+			long tLoad = StartupTrace.begin();
+			Resource applicationResource = loadResource(applicationDefinitionInstance, null);
+			StartupTrace.record("handler.loadMostRecentModel/load default model (XMIResource.load)", tLoad); //$NON-NLS-1$
 			MApplication theApp = (MApplication) applicationResource.getContents().get(0);
 			resource = createResourceWithApp(theApp);
 			context.set(E4Workbench.NO_SAVED_MODEL_FOUND, Boolean.TRUE);
@@ -257,10 +264,14 @@ public class ResourceHandler implements IModelResourceHandler {
 	}
 
 	// Ensures that even models with error are loaded!
-	private Resource loadResource(URI uri) {
+	private Resource loadResource(URI uri, String tracePhasePrefix) {
 		Resource resource;
 		try {
+			long tLoad = StartupTrace.begin();
 			resource = getResource(uri);
+			if (tracePhasePrefix != null) {
+				StartupTrace.record(tracePhasePrefix + "/load delta resource", tLoad); //$NON-NLS-1$
+			}
 		} catch (Exception e) {
 			// TODO We could use diagnostics for better analyzing the error
 			logger.error(e, "Unable to load resource " + uri); //$NON-NLS-1$
@@ -270,12 +281,18 @@ public class ResourceHandler implements IModelResourceHandler {
 		// TODO once we switch from deltas, we only need this once on the default model?
 		String contributorURI = URIHelper.EMFtoPlatform(uri);
 		if (contributorURI != null) {
+			long tApply = StartupTrace.begin();
+			int count = 0;
 			TreeIterator<EObject> it = EcoreUtil.getAllContents(resource.getContents());
 			while (it.hasNext()) {
 				EObject o = it.next();
 				if (o instanceof MApplicationElement) {
 					((MApplicationElement) o).setContributorURI(contributorURI);
+					count++;
 				}
+			}
+			if (tracePhasePrefix != null) {
+				StartupTrace.record(tracePhasePrefix + "/apply delta (count=" + count + ")", tApply); //$NON-NLS-1$ //$NON-NLS-2$
 			}
 		}
 		return resource;

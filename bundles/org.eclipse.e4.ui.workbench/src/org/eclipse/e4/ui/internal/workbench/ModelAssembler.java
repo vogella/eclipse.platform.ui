@@ -41,6 +41,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.eclipse.core.internal.runtime.StartupTrace;
 import org.eclipse.core.runtime.IConfigurationElement;
 import org.eclipse.core.runtime.IExtension;
 import org.eclipse.core.runtime.IExtensionPoint;
@@ -314,11 +315,17 @@ public class ModelAssembler {
 			IExtension[] extensions = new ExtensionsSort().sort(extPoint.getExtensions());
 
 			// run processors which are marked to run before fragments
+			long tProcBefore = StartupTrace.begin();
 			runProcessors(extensions, initial, false);
+			StartupTrace.record("handler.loadMostRecentModel/processor.process", tProcBefore); //$NON-NLS-1$
 			// process fragments (and resolve imports)
+			long tFrag = StartupTrace.begin();
 			processFragments(extensions, initial);
+			StartupTrace.record("handler.loadMostRecentModel/fragments.process", tFrag); //$NON-NLS-1$
 			// run processors which are marked to run after fragments
+			long tProcAfter = StartupTrace.begin();
 			runProcessors(extensions, initial, true);
+			StartupTrace.record("handler.loadMostRecentModel/processor.process", tProcAfter); //$NON-NLS-1$
 		}
 
 		// once we are done, any further handling in the tracker can't be initial
