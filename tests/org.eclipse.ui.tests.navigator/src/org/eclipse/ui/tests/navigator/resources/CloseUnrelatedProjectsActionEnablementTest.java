@@ -18,10 +18,13 @@ import org.eclipse.core.resources.IProjectDescription;
 import org.eclipse.core.resources.IWorkspace;
 import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.CoreException;
+import org.eclipse.jface.preference.IPreferenceStore;
 import org.eclipse.jface.viewers.StructuredSelection;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Shell;
 import org.eclipse.ui.actions.CloseUnrelatedProjectsAction;
+import org.eclipse.ui.internal.ide.IDEInternalPreferences;
+import org.eclipse.ui.internal.ide.IDEWorkbenchPlugin;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,15 +34,21 @@ public class CloseUnrelatedProjectsActionEnablementTest {
 	private IProject a;
 	private IProject b;
 	private IProject c;
+	private IProject d;
+	private boolean oldCloseUnrelated;
 	private Shell shell;
 
 	@BeforeEach
 	public void setUp() throws CoreException {
+		IPreferenceStore store = IDEWorkbenchPlugin.getDefault().getPreferenceStore();
+		oldCloseUnrelated = store.getBoolean(IDEInternalPreferences.CLOSE_UNRELATED_PROJECTS);
+		store.setValue(IDEInternalPreferences.CLOSE_UNRELATED_PROJECTS, true);
 		IWorkspace ws = ResourcesPlugin.getWorkspace();
 		long suffix = System.nanoTime();
 		a = ws.getRoot().getProject("CUPA_A_" + suffix);
 		b = ws.getRoot().getProject("CUPA_B_" + suffix);
 		c = ws.getRoot().getProject("CUPA_C_" + suffix);
+		d = ws.getRoot().getProject("CUPA_D_" + suffix);
 		a.create(null);
 		a.open(null);
 		b.create(null);
@@ -59,11 +68,102 @@ public class CloseUnrelatedProjectsActionEnablementTest {
 		if (shell != null && !shell.isDisposed()) {
 			shell.dispose();
 		}
-		for (IProject p : new IProject[] { a, b, c }) {
+		IDEWorkbenchPlugin.getDefault().getPreferenceStore().setValue(IDEInternalPreferences.CLOSE_UNRELATED_PROJECTS,
+				oldCloseUnrelated);
+		for (IProject p : new IProject[] { a, b, c, d }) {
 			if (p != null && p.exists()) {
 				p.delete(true, true, null);
 			}
 		}
+	}
+
+	@Test
+	public void testDisabledAfterAllUnrelatedProjectsClosedAndSelectionChanges() throws CoreException {
+		CloseUnrelatedProjectsAction action = new CloseUnrelatedProjectsAction(() -> shell);
+
+		action.selectionChanged(new StructuredSelection(a));
+		assertTrue(action.isEnabled(), "action must be enabled while unrelated open project C exists");
+
+		c.close(null);
+
+		action.selectionChanged(new StructuredSelection(b));
+		assertFalse(action.isEnabled(), "action must be disabled when no unrelated open project remains");
+	}
+
+	@Test
+	public void testDisabledAfterAllUnrelatedProjectsAreDeleted() throws CoreException {
+		CloseUnrelatedProjectsAction action = new CloseUnrelatedProjectsAction(() -> shell);
+
+		action.selectionChanged(new StructuredSelection(a));
+		assertTrue(action.isEnabled(), "action must be enabled while unrelated open project C exists");
+
+		c.delete(true, true, null);
+
+		action.selectionChanged(new StructuredSelection(a));
+		assertFalse(action.isEnabled(), "action must be disabled when no unrelated open project remains");
+	}
+
+	@Test
+	public void testDoNotCloseDeleted() throws CoreException {
+		CloseUnrelatedProjectsAction action = new CloseUnrelatedProjectsAction(() -> shell);
+
+		action.selectionChanged(new StructuredSelection(a));
+		assertTrue(action.isEnabled(), "action must be enabled while unrelated open project C exists");
+
+		c.delete(true, true, null);
+
+		action.selectionChanged(new StructuredSelection(a));
+		assertFalse(action.isEnabled(), "action must be disabled when no unrelated open project remains");
+		action.run(); // should not throw
+	}
+
+	@Test
+	public void testDisabledAfterUnrelatedProjectCreated() throws CoreException {
+		CloseUnrelatedProjectsAction action = new CloseUnrelatedProjectsAction(() -> shell);
+		c.close(null);
+		action.selectionChanged(new StructuredSelection(b));
+		assertFalse(action.isEnabled(), "action must be disabled when no unrelated open project remains");
+
+		d.create(null);
+		d.open(null);
+
+		action.selectionChanged(new StructuredSelection(b));
+		assertTrue(action.isEnabled(), "action must be enabled unrelated project is created");
+	}
+
+	@Test
+	public void testEnabledAfterDeleteAndReopen() throws CoreException {
+		CloseUnrelatedProjectsAction action = new CloseUnrelatedProjectsAction(() -> shell);
+		action.selectionChanged(new StructuredSelection(b));
+		assertTrue(action.isEnabled(), "action must be enabled when and unrelated open project remains");
+		action.run(); // should not throw
+
+		d.create(null);
+		d.open(null);
+
+		action.selectionChanged(new StructuredSelection(b));
+		assertTrue(action.isEnabled(), "action must be enabled when unrelated project is created");
+
+		d.delete(true, true, null);
+		c.open(null);
+
+		action.selectionChanged(new StructuredSelection(b));
+		assertTrue(action.isEnabled(), "action must be enabled when unrelated project is reopened");
+		action.run(); // should not throw
+	}
+
+	@Test
+	public void testDisabledAfterRunAndUnrelatedProjectCreated() throws CoreException {
+		CloseUnrelatedProjectsAction action = new CloseUnrelatedProjectsAction(() -> shell);
+		action.selectionChanged(new StructuredSelection(b));
+		assertTrue(action.isEnabled(), "action must be enabled while unrelated open projects exist");
+		action.run();
+
+		d.create(null);
+		d.open(null);
+
+		action.selectionChanged(new StructuredSelection(b));
+		assertTrue(action.isEnabled(), "action must be enabled unrelated project is created");
 	}
 
 	@Test
