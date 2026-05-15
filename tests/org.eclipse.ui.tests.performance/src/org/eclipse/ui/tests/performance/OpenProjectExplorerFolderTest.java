@@ -13,7 +13,7 @@
  *******************************************************************************/
 package org.eclipse.ui.tests.performance;
 
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -28,14 +28,16 @@ import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.NullProgressMonitor;
 import org.eclipse.core.runtime.Platform;
-import org.eclipse.test.performance.PerformanceTestCaseJunit4;
+import org.eclipse.test.performance.Performance;
+import org.eclipse.test.performance.PerformanceMeter;
 import org.eclipse.ui.IViewPart;
 import org.eclipse.ui.IWorkbenchPage;
 import org.eclipse.ui.PartInitException;
 import org.eclipse.ui.PlatformUI;
 import org.eclipse.ui.navigator.resources.ProjectExplorer;
-import org.junit.ClassRule;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInfo;
+import org.junit.jupiter.api.extension.RegisterExtension;
 import org.osgi.framework.Bundle;
 
 
@@ -61,72 +63,79 @@ import org.osgi.framework.Bundle;
  * "sleep" to simulate computations, it only effects Elapsed Time (not CPU
  * Time).
  */
-public class OpenProjectExplorerFolderTest extends PerformanceTestCaseJunit4 {
+public class OpenProjectExplorerFolderTest {
 
-	@ClassRule
-	public static final UIPerformanceTestRule uiPerformanceTestRule = new UIPerformanceTestRule();
+	@RegisterExtension
+	static UIPerformanceTestRule uiPerformanceTestRule = new UIPerformanceTestRule();
 
 	/*
 	 * performance testcase for bug 106158
 	 * https://bugs.eclipse.org/bugs/show_bug.cgi?id=106158
 	 */
 	@Test
-	public void testOpenNavigatorFolder() {
-		IProject project = createProject("testViewAndContentTypeProject");
-		Bundle bundle = Platform.getBundle("org.eclipse.ui.tests.performance");
-		URL url = bundle.getEntry("data/testContentType.zip");
-		try (ZipInputStream zis = new ZipInputStream(url.openStream())) {
-			ZipEntry entry = zis.getNextEntry();
-			while (entry != null) {
-				byte[] content = new byte[0];
-				try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
-					byte[] b = new byte[2048];
-					int read = zis.read(b);
-					while (read != -1) {
-						baos.write(b, 0, read);
-						read = zis.read(b);
+	public void testOpenNavigatorFolder(TestInfo testInfo) {
+		Performance perf = Performance.getDefault();
+		String scenarioId = getClass().getName() + "." + testInfo.getDisplayName();
+		PerformanceMeter meter = perf.createPerformanceMeter(scenarioId);
+		try {
+			IProject project = createProject("testViewAndContentTypeProject");
+			Bundle bundle = Platform.getBundle("org.eclipse.ui.tests.performance");
+			URL url = bundle.getEntry("data/testContentType.zip");
+			try (ZipInputStream zis = new ZipInputStream(url.openStream())) {
+				ZipEntry entry = zis.getNextEntry();
+				while (entry != null) {
+					byte[] content = new byte[0];
+					try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+						byte[] b = new byte[2048];
+						int read = zis.read(b);
+						while (read != -1) {
+							baos.write(b, 0, read);
+							read = zis.read(b);
+						}
+						content = baos.toByteArray();
 					}
-					content = baos.toByteArray();
+					catch (IOException e) {
+						fail(e.getMessage());
+					}
+					IFile file = project.getFile(entry.getName());
+					try (ByteArrayInputStream bais = new ByteArrayInputStream(content)) {
+						if (!file.exists())
+							file.create(bais, true, new NullProgressMonitor());
+						else
+							file.setContents(bais, true, false, new NullProgressMonitor());
+					}
+					catch (CoreException e) {
+						fail(e.getMessage());
+					}
+					entry = zis.getNextEntry();
 				}
-				catch (IOException e) {
-					fail(e.getMessage());
-				}
-				IFile file = project.getFile(entry.getName());
-				try (ByteArrayInputStream bais = new ByteArrayInputStream(content)) {
-					if (!file.exists())
-						file.create(bais, true, new NullProgressMonitor());
-					else
-						file.setContents(bais, true, false, new NullProgressMonitor());
-				}
-				catch (CoreException e) {
-					fail(e.getMessage());
-				}
-				entry = zis.getNextEntry();
 			}
+			catch (IOException e) {
+				fail(e.getMessage());
+			}
+			meter.start();
+			IWorkbenchPage activePage = PlatformUI.getWorkbench().getActiveWorkbenchWindow().getActivePage();
+			IViewPart view = null;
+			try {
+				view = activePage.showView(ProjectExplorer.VIEW_ID);
+			}
+			catch (PartInitException e) {
+				fail(e.getMessage());
+			}
+			ProjectExplorer projectExplorer = null;
+			try {
+				projectExplorer = (ProjectExplorer) view;
+			}
+			catch (ClassCastException e) {
+				fail(e.getMessage());
+			}
+			projectExplorer.getCommonViewer().expandAll();
+			meter.stop();
+			meter.commit();
+			perf.assertPerformance(meter);
+		} finally {
+			meter.dispose();
 		}
-		catch (IOException e) {
-			fail(e.getMessage());
-		}
-		startMeasuring();
-		IWorkbenchPage activePage = PlatformUI.getWorkbench().getActiveWorkbenchWindow().getActivePage();
-		IViewPart view = null;
-		try {
-			view = activePage.showView(ProjectExplorer.VIEW_ID);
-		}
-		catch (PartInitException e) {
-			fail(e.getMessage());
-		}
-		ProjectExplorer projectExplorer = null;
-		try {
-			projectExplorer = (ProjectExplorer) view;
-		}
-		catch (ClassCastException e) {
-			fail(e.getMessage());
-		}
-		projectExplorer.getCommonViewer().expandAll();
-		stopMeasuring();
-		commitMeasurements();
-		assertPerformance();
 	}
 
 	private IProject createProject(String name) {
