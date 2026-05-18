@@ -295,6 +295,9 @@ public class ToolBarManagerRenderer extends SWTPartRenderer {
 	@Optional
 	private void subscribeTopicDirtyChanged(
 			@SuppressWarnings("unused") @UIEventTopic(UIEvents.Dirtyable.TOPIC_DIRTY) Event eventData) {
+		if (RendererPerfTracer.ENABLED) {
+			RendererPerfTracer.count(RendererPerfTracer.H04_DIRTY_ALL_SELECTOR, null);
+		}
 		getUpdater().updateContributionItems(ALL_SELECTOR);
 	}
 
@@ -515,6 +518,10 @@ public class ToolBarManagerRenderer extends SWTPartRenderer {
 						return false;
 					}
 
+					if (RendererPerfTracer.ENABLED) {
+						RendererPerfTracer.count(RendererPerfTracer.H14_RAT_UNCOALESCED,
+								toolbarModel.getElementId());
+					}
 					record.updateVisibility(parentContext.getActiveLeaf());
 					runExternalCode(() -> {
 						updateToolbar(toolbarModel, manager);
@@ -733,10 +740,14 @@ public class ToolBarManagerRenderer extends SWTPartRenderer {
 	}
 
 	private void updateWidget(ToolBarManager manager) {
+		long _t0 = RendererPerfTracer.ENABLED ? RendererPerfTracer.begin() : 0;
 		manager.update(true);
 		ToolBar toolbar = manager.getControl();
 		if (toolbar != null && !toolbar.isDisposed()) {
 			toolbar.requestLayout();
+		}
+		if (RendererPerfTracer.ENABLED) {
+			RendererPerfTracer.trace(RendererPerfTracer.H03_TOOLBAR_UPDATE_WIDGET, _t0, null);
 		}
 	}
 

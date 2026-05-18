@@ -1142,6 +1142,9 @@ public class MenuManagerRenderer extends SWTPartRenderer {
 	}
 
 	private void scheduleManagerUpdate(IContributionManager mgr) {
+		if (RendererPerfTracer.ENABLED) {
+			RendererPerfTracer.count(RendererPerfTracer.H06_MENU_SCHEDULE_UPDATE, mgr.getClass().getSimpleName());
+		}
 		// Bug 467000: Avoid repeatedly updating menu managers
 		// This workaround is opt-in for 4.5
 		boolean workaroundEnabled = Boolean.getBoolean("eclipse.workaround.bug467000"); //$NON-NLS-1$

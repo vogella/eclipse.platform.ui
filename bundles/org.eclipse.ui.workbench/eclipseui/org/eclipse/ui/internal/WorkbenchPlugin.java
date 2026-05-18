@@ -58,6 +58,7 @@ import org.eclipse.ui.internal.help.CommandHelpServiceImpl;
 import org.eclipse.ui.internal.help.HelpServiceImpl;
 import org.eclipse.ui.internal.intro.IIntroRegistry;
 import org.eclipse.ui.internal.intro.IntroRegistry;
+import org.eclipse.core.internal.runtime.StartupTrace;
 import org.eclipse.ui.internal.misc.StatusUtil;
 import org.eclipse.ui.internal.operations.WorkbenchOperationSupport;
 import org.eclipse.ui.internal.progress.ProgressManager;
@@ -1253,7 +1254,9 @@ public class WorkbenchPlugin extends AbstractUIPlugin {
 			@Override
 			public Object compute(IEclipseContext context, String contextKey) {
 				if (viewRegistry == null) {
+					long t = StartupTrace.begin();
 					viewRegistry = ContextInjectionFactory.make(ViewRegistry.class, e4Context);
+					StartupTrace.record("ContextFunction.compute/ViewRegistry (first touch)", t); //$NON-NLS-1$
 				}
 				return viewRegistry;
 			}
@@ -1324,7 +1327,6 @@ public class WorkbenchPlugin extends AbstractUIPlugin {
 							PlatformUI.getWorkbench());
 					registryReader.loadFromRegistry(Platform.getExtensionRegistry());
 					preferenceManager.addPages(registryReader.getTopLevelNodes());
-
 				}
 				return preferenceManager;
 			}
@@ -1343,9 +1345,11 @@ public class WorkbenchPlugin extends AbstractUIPlugin {
 			@Override
 			public Object compute(IEclipseContext context, String contextKey) {
 				if (themeRegistry == null) {
+					long t = StartupTrace.begin();
 					themeRegistry = new ThemeRegistry();
 					ThemeRegistryReader reader = new ThemeRegistryReader();
 					reader.readThemes(Platform.getExtensionRegistry(), themeRegistry);
+					StartupTrace.record("ContextFunction.compute/ThemeRegistry (first touch)", t); //$NON-NLS-1$
 				}
 				return themeRegistry;
 			}
@@ -1354,8 +1358,10 @@ public class WorkbenchPlugin extends AbstractUIPlugin {
 			@Override
 			public Object compute(IEclipseContext context, String contextKey) {
 				if (workingSetManager == null) {
+					long t = StartupTrace.begin();
 					workingSetManager = new WorkingSetManager(bundleContext);
 					workingSetManager.restoreState();
+					StartupTrace.record("ContextFunction.compute/WorkingSetManager (first touch)", t); //$NON-NLS-1$
 				}
 				return workingSetManager;
 			}
@@ -1374,7 +1380,9 @@ public class WorkbenchPlugin extends AbstractUIPlugin {
 			@Override
 			public Object compute(IEclipseContext context, String contextKey) {
 				if (editorRegistry == null) {
+					long t = StartupTrace.begin();
 					editorRegistry = new EditorRegistry(Platform.getContentTypeManager());
+					StartupTrace.record("ContextFunction.compute/EditorRegistry (first touch)", t); //$NON-NLS-1$
 				}
 				return editorRegistry;
 			}

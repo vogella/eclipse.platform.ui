@@ -84,7 +84,11 @@ public class SashRenderer extends SWTPartRenderer {
 					return;
 				}
 			}
+			long _t0 = RendererPerfTracer.ENABLED ? RendererPerfTracer.begin() : 0;
 			s.layout(true, true);
+			if (RendererPerfTracer.ENABLED) {
+				RendererPerfTracer.trace(RendererPerfTracer.W1_SASH_SYNC_LAYOUT, _t0, null);
+			}
 		} else {
 			s.requestLayout();
 		}

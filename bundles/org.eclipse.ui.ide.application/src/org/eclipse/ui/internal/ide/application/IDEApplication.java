@@ -34,6 +34,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Properties;
 
+import org.eclipse.core.internal.runtime.StartupTrace;
 import org.eclipse.core.runtime.IConfigurationElement;
 import org.eclipse.core.runtime.IExecutableExtension;
 import org.eclipse.core.runtime.IProduct;
@@ -148,68 +149,77 @@ public class IDEApplication implements IApplication, IExecutableExtension {
 
 	@Override
 	public Object start(IApplicationContext appContext) throws Exception {
-		// Suspend the job manager to prevent background jobs from running. This
-		// is done to reduce resource contention during startup.
-		// The job manager will be resumed by the
-		// IDEWorkbenchAdvisor.postStartup method.
-		Job.getJobManager().suspend();
-
-		Display display = createDisplay();
-
-		initializeDefaultTheme(display);
-
-		// processor must be created before we start event loop
-		DelayedEventsProcessor processor = new DelayedEventsProcessor(display);
-
+		long tStart = StartupTrace.begin();
 		try {
+			// Suspend the job manager to prevent background jobs from running. This
+			// is done to reduce resource contention during startup.
+			// The job manager will be resumed by the
+			// IDEWorkbenchAdvisor.postStartup method.
+			Job.getJobManager().suspend();
 
-			// look and see if there's a splash shell we can parent off of
-			Shell shell = WorkbenchPlugin.getSplashShell(display);
-			if (shell != null) {
-				// should should set the icon and message for this shell to be the
-				// same as the chooser dialog - this will be the guy that lives in
-				// the task bar and without these calls you'd have the default icon
-				// with no message.
-				shell.setText(ChooseWorkspaceDialog.getWindowTitle());
-				shell.setImages(Window.getDefaultImages());
+			Display display = createDisplay();
+
+			long tProduct = StartupTrace.begin();
+			initializeDefaultTheme(display);
+
+			// processor must be created before we start event loop
+			DelayedEventsProcessor processor = new DelayedEventsProcessor(display);
+
+			try {
+
+				// look and see if there's a splash shell we can parent off of
+				Shell shell = WorkbenchPlugin.getSplashShell(display);
+				if (shell != null) {
+					// should should set the icon and message for this shell to be the
+					// same as the chooser dialog - this will be the guy that lives in
+					// the task bar and without these calls you'd have the default icon
+					// with no message.
+					shell.setText(ChooseWorkspaceDialog.getWindowTitle());
+					shell.setImages(Window.getDefaultImages());
+				}
+				StartupTrace.record("IDEApplication.start/initializeProduct", tProduct); //$NON-NLS-1$
+
+				long tCheck = StartupTrace.begin();
+				Object instanceLocationCheck = checkInstanceLocation(shell, appContext.getArguments());
+				StartupTrace.record("IDEApplication.start/checkInstanceLocation", tCheck); //$NON-NLS-1$
+				if (instanceLocationCheck != null) {
+					WorkbenchPlugin.unsetSplashShell(display);
+					return instanceLocationCheck;
+				}
+
+				// Reset early dark theme styling before the workbench starts;
+				// the ThemeEngine will apply the correct theme from here on.
+				resetEarlyDarkTheme(display);
+
+				// create the workbench with this advisor and run it until it exits
+				// N.B. createWorkbench remembers the advisor, and also registers
+				// the workbench globally so that all UI plug-ins can find it using
+				// PlatformUI.getWorkbench() or AbstractUIPlugin.getWorkbench()
+				int returnCode = PlatformUI.createAndRunWorkbench(display,
+						new IDEWorkbenchAdvisor(processor));
+
+				// the workbench doesn't support relaunch yet (bug 61809) so
+				// for now restart is used, and exit data properties are checked
+				// here to substitute in the relaunch return code if needed
+				if (returnCode != PlatformUI.RETURN_RESTART) {
+					return EXIT_OK;
+				}
+
+				// if the exit code property has been set to the relaunch code, then
+				// return that code now, otherwise this is a normal restart
+				return EXIT_RELAUNCH.equals(Integer.getInteger(Workbench.PROP_EXIT_CODE)) ? EXIT_RELAUNCH
+						: EXIT_RESTART;
+			} finally {
+				if (display != null) {
+					display.dispose();
+				}
+				Location instanceLoc = Platform.getInstanceLocation();
+				if (instanceLoc != null) {
+					instanceLoc.release();
+				}
 			}
-
-			Object instanceLocationCheck = checkInstanceLocation(shell, appContext.getArguments());
-			if (instanceLocationCheck != null) {
-				WorkbenchPlugin.unsetSplashShell(display);
-				return instanceLocationCheck;
-			}
-
-			// Reset early dark theme styling before the workbench starts;
-			// the ThemeEngine will apply the correct theme from here on.
-			resetEarlyDarkTheme(display);
-
-			// create the workbench with this advisor and run it until it exits
-			// N.B. createWorkbench remembers the advisor, and also registers
-			// the workbench globally so that all UI plug-ins can find it using
-			// PlatformUI.getWorkbench() or AbstractUIPlugin.getWorkbench()
-			int returnCode = PlatformUI.createAndRunWorkbench(display,
-					new IDEWorkbenchAdvisor(processor));
-
-			// the workbench doesn't support relaunch yet (bug 61809) so
-			// for now restart is used, and exit data properties are checked
-			// here to substitute in the relaunch return code if needed
-			if (returnCode != PlatformUI.RETURN_RESTART) {
-				return EXIT_OK;
-			}
-
-			// if the exit code property has been set to the relaunch code, then
-			// return that code now, otherwise this is a normal restart
-			return EXIT_RELAUNCH.equals(Integer.getInteger(Workbench.PROP_EXIT_CODE)) ? EXIT_RELAUNCH
-					: EXIT_RESTART;
 		} finally {
-			if (display != null) {
-				display.dispose();
-			}
-			Location instanceLoc = Platform.getInstanceLocation();
-			if (instanceLoc != null) {
-				instanceLoc.release();
-			}
+			StartupTrace.record("IDEApplication.start (total)", tStart); //$NON-NLS-1$
 		}
 	}
 
@@ -532,6 +542,8 @@ public class IDEApplication implements IApplication, IExecutableExtension {
 	 */
 	private URL promptForWorkspace(Shell shell, ChooseWorkspaceData launchData,
 			boolean force) {
+		long tPrompt = StartupTrace.begin();
+		try {
 		URL url = null;
 
 		do {
@@ -586,6 +598,9 @@ public class IDEApplication implements IApplication, IExecutableExtension {
 			}
 			return url;
 		} while (true);
+		} finally {
+			StartupTrace.record("IDEApplication.start/promptForWorkspace", tPrompt); //$NON-NLS-1$
+		}
 	}
 
 	/**

@@ -170,20 +170,25 @@ public class WorkbenchLabelProvider extends LabelProvider
 
 	@Override
 	public final Image getImage(Object element) {
-		// obtain the base image by querying the element
-		IWorkbenchAdapter adapter = getAdapter(element);
-		if (adapter == null) {
-			return null;
-		}
-		ImageDescriptor descriptor = adapter.getImageDescriptor(element);
-		if (descriptor == null) {
-			return null;
-		}
+		long t = org.eclipse.core.internal.runtime.StartupTrace.begin();
+		try {
+			// obtain the base image by querying the element
+			IWorkbenchAdapter adapter = getAdapter(element);
+			if (adapter == null) {
+				return null;
+			}
+			ImageDescriptor descriptor = adapter.getImageDescriptor(element);
+			if (descriptor == null) {
+				return null;
+			}
 
-		// add any annotations to the image descriptor
-		descriptor = decorateImage(descriptor, element);
+			// add any annotations to the image descriptor
+			descriptor = decorateImage(descriptor, element);
 
-		return getResourceManager().get(descriptor);
+			return getResourceManager().get(descriptor);
+		} finally {
+			org.eclipse.core.internal.runtime.StartupTrace.record("WorkbenchLabelProvider.getImage", t); //$NON-NLS-1$
+		}
 	}
 
 	/**
@@ -231,15 +236,20 @@ public class WorkbenchLabelProvider extends LabelProvider
 
 	@Override
 	public final String getText(Object element) {
-		// query the element for its label
-		IWorkbenchAdapter adapter = getAdapter(element);
-		if (adapter == null) {
-			return ""; //$NON-NLS-1$
-		}
-		String label = adapter.getLabel(element);
+		long t = org.eclipse.core.internal.runtime.StartupTrace.begin();
+		try {
+			// query the element for its label
+			IWorkbenchAdapter adapter = getAdapter(element);
+			if (adapter == null) {
+				return ""; //$NON-NLS-1$
+			}
+			String label = adapter.getLabel(element);
 
-		// return the decorated label
-		return decorateText(label, element);
+			// return the decorated label
+			return decorateText(label, element);
+		} finally {
+			org.eclipse.core.internal.runtime.StartupTrace.record("WorkbenchLabelProvider.getText", t); //$NON-NLS-1$
+		}
 	}
 
 	@Override

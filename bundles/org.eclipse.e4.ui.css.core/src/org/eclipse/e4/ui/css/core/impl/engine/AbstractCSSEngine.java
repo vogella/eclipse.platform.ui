@@ -369,8 +369,23 @@ public abstract class AbstractCSSEngine implements CSSEngine {
 		applyStyles(element, applyStylesToChildNodes, computeDefaultStyle);
 	}
 
+	private int applyStylesDepth;
+
 	@Override
 	public void applyStyles(Object element, boolean applyStylesToChildNodes, boolean computeDefaultStyle) {
+		long traceStart = applyStylesDepth == 0 ? org.eclipse.core.internal.runtime.StartupTrace.begin() : 0L;
+		applyStylesDepth++;
+		try {
+			applyStylesImpl(element, applyStylesToChildNodes, computeDefaultStyle);
+		} finally {
+			applyStylesDepth--;
+			if (applyStylesDepth == 0) {
+				org.eclipse.core.internal.runtime.StartupTrace.record("CSSEngine.applyStyles", traceStart); //$NON-NLS-1$
+			}
+		}
+	}
+
+	private void applyStylesImpl(Object element, boolean applyStylesToChildNodes, boolean computeDefaultStyle) {
 		Element elt = getElement(element);
 		if (elt == null || !isVisible(elt)) {
 			return;
