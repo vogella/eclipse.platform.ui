@@ -139,13 +139,21 @@ public class CSSSWTEngineImpl extends CSSEngineImpl {
 
 	@Override
 	public void reapply() {
+		final boolean trace = org.eclipse.e4.ui.css.core.impl.engine.CSSCorePolicy.DEBUG_PERF;
+		long t0 = trace ? System.nanoTime() : 0;
 		startStylingSession();
 		try {
 			Shell[] shells = display.getShells();
 			for (Shell s : shells) {
 				try {
 					s.setRedraw(false);
+					long r0 = trace ? System.nanoTime() : 0;
 					s.reskin(SWT.ALL);
+					if (trace) {
+						org.eclipse.e4.ui.css.core.impl.engine.CSSCorePolicy.reskinNs
+								.addAndGet(System.nanoTime() - r0);
+						org.eclipse.e4.ui.css.core.impl.engine.CSSCorePolicy.reskinCount.incrementAndGet();
+					}
 					applyStyles(s, true);
 				} catch (Exception e) {
 					ILog.of(getClass()).error(e.getMessage(), e);
@@ -155,6 +163,10 @@ public class CSSSWTEngineImpl extends CSSEngineImpl {
 			}
 		} finally {
 			stopStylingSession();
+			if (trace) {
+				org.eclipse.e4.ui.css.core.impl.engine.CSSCorePolicy.reapplyNs.addAndGet(System.nanoTime() - t0);
+				org.eclipse.e4.ui.css.core.impl.engine.CSSCorePolicy.reapplyCount.incrementAndGet();
+			}
 		}
 	}
 }

@@ -1,0 +1,13 @@
+# Debugging options for the org.eclipse.e4.ui.css.core plugin.
+
+# Master switch. Must be true for any of the more specific debug
+# options below to take effect.
+org.eclipse.e4.ui.css.core/debug=false
+
+# Accumulate per-phase timings inside the CSS engine (applyStyles,
+# getComputedStyle, selector match, applyStyleDeclaration,
+# applyCSSProperty) and print a summary to stdout after each
+# top-level applyStyles call. Useful for measuring where time goes
+# during a theme swap. Has no effect unless the master "debug"
+# option is also true.
+org.eclipse.e4.ui.css.core/debug/perf=false

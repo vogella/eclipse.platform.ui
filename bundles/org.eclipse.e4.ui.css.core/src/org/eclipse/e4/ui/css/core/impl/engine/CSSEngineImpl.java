@@ -189,6 +189,19 @@ public abstract class CSSEngineImpl implements CSSEngine {
 
 	@Override
 	public StyleSheet parseStyleSheet(InputSource source) throws IOException {
+		final boolean trace = CSSCorePolicy.DEBUG_PERF;
+		long t0 = trace ? System.nanoTime() : 0;
+		try {
+			return parseStyleSheetInternal(source);
+		} finally {
+			if (trace) {
+				CSSCorePolicy.parseStyleSheetNs.addAndGet(System.nanoTime() - t0);
+				CSSCorePolicy.parseStyleSheetCount.incrementAndGet();
+			}
+		}
+	}
+
+	private StyleSheet parseStyleSheetInternal(InputSource source) throws IOException {
 		// Check that CharacterStream or ByteStream is not null
 		checkInputSource(source);
 		CSSParser parser = makeCSSParser();
@@ -407,9 +420,30 @@ public abstract class CSSEngineImpl implements CSSEngine {
 
 	@Override
 	public void applyStyles(Object element, boolean applyStylesToChildNodes, boolean computeDefaultStyle) {
+		final boolean trace = CSSCorePolicy.DEBUG_PERF;
+		long t0 = trace ? System.nanoTime() : 0;
+		try {
+			applyStylesInternal(element, applyStylesToChildNodes, computeDefaultStyle);
+		} finally {
+			if (trace) {
+				CSSCorePolicy.applyStylesNs.addAndGet(System.nanoTime() - t0);
+				CSSCorePolicy.applyStylesCount.incrementAndGet();
+			}
+		}
+	}
+
+	private void applyStylesInternal(Object element, boolean applyStylesToChildNodes, boolean computeDefaultStyle) {
+		final boolean trace = CSSCorePolicy.DEBUG_PERF;
+		long entryT0 = trace ? System.nanoTime() : 0;
 		Element elt = getElement(element);
 		if (elt == null || !isVisible(elt)) {
+			if (trace) {
+				CSSCorePolicy.applyStylesEntryNs.addAndGet(System.nanoTime() - entryT0);
+			}
 			return;
+		}
+		if (trace) {
+			CSSCorePolicy.applyStylesEntryNs.addAndGet(System.nanoTime() - entryT0);
 		}
 
 		if (isElementStyled(element)) {
@@ -444,6 +478,7 @@ public abstract class CSSEngineImpl implements CSSEngine {
 		/*
 		 * Manage static pseudo instances
 		 */
+		long pseudoT0 = trace ? System.nanoTime() : 0;
 		String[] pseudoInstances = getStaticPseudoInstances(elt);
 		if (pseudoInstances != null && pseudoInstances.length > 0) {
 			// there are static pseudo instances defined, loop for it and
@@ -467,18 +502,27 @@ public abstract class CSSEngineImpl implements CSSEngine {
 				}
 			}
 		}
+		if (trace) {
+			CSSCorePolicy.pseudoCascadeNs.addAndGet(System.nanoTime() - pseudoT0);
+		}
 
 		if (style != null) {
 			applyStyleDeclaration(elt, style, null);
 		}
+		long inlineT0 = trace ? System.nanoTime() : 0;
 		try {
 			// Apply inline style
 			applyInlineStyle(elt, false);
 		} catch (Exception e) {
 			handleExceptions(e);
 		}
+		if (trace) {
+			CSSCorePolicy.applyInlineStyleNs.addAndGet(System.nanoTime() - inlineT0);
+			CSSCorePolicy.applyInlineStyleCount.incrementAndGet();
+		}
 
 		if (applyStylesToChildNodes) {
+			long childT0 = trace ? System.nanoTime() : 0;
 			/*
 			 * Style all children recursive.
 			 */
@@ -489,6 +533,9 @@ public abstract class CSSEngineImpl implements CSSEngine {
 						processNodeList(nodes, this::applyStyles, applyStylesToChildNodes);
 						onStylesAppliedToChildNodes(elt, nodes);
 					}
+			if (trace) {
+				CSSCorePolicy.childRecursionNs.addAndGet(System.nanoTime() - childT0);
+			}
 		}
 	}
 
@@ -591,6 +638,19 @@ public abstract class CSSEngineImpl implements CSSEngine {
 
 	@Override
 	public void applyStyleDeclaration(Object element, CSSStyleDeclaration style, String pseudo) {
+		final boolean trace = CSSCorePolicy.DEBUG_PERF;
+		long t0 = trace ? System.nanoTime() : 0;
+		try {
+			applyStyleDeclarationInternal(element, style, pseudo);
+		} finally {
+			if (trace) {
+				CSSCorePolicy.applyStyleDeclarationNs.addAndGet(System.nanoTime() - t0);
+				CSSCorePolicy.applyStyleDeclarationCount.incrementAndGet();
+			}
+		}
+	}
+
+	private void applyStyleDeclarationInternal(Object element, CSSStyleDeclaration style, String pseudo) {
 		// Apply style
 		boolean avoidanceCacheInstalled = currentCSSPropertiesApplied == null;
 		if (avoidanceCacheInstalled) {
@@ -760,6 +820,20 @@ public abstract class CSSEngineImpl implements CSSEngine {
 	@Override
 	public ICSSPropertyHandler applyCSSProperty(Object element, String property, CSSValue value, String pseudo)
 			throws Exception {
+		final boolean trace = CSSCorePolicy.DEBUG_PERF;
+		long t0 = trace ? System.nanoTime() : 0;
+		try {
+			return applyCSSPropertyInternal(element, property, value, pseudo);
+		} finally {
+			if (trace) {
+				CSSCorePolicy.applyCSSPropertyNs.addAndGet(System.nanoTime() - t0);
+				CSSCorePolicy.applyCSSPropertyCount.incrementAndGet();
+			}
+		}
+	}
+
+	private ICSSPropertyHandler applyCSSPropertyInternal(Object element, String property, CSSValue value, String pseudo)
+			throws Exception {
 		if (currentCSSPropertiesApplied != null && currentCSSPropertiesApplied.containsKey(property)) {
 			// CSS Property was already applied, ignore it.
 			return null;
@@ -777,14 +851,25 @@ public abstract class CSSEngineImpl implements CSSEngine {
 			value = parsePropertyValue(parentValueString);
 		}
 
+		final boolean trace = CSSCorePolicy.DEBUG_PERF;
 		for (ICSSPropertyHandlerProvider provider : propertyHandlerProviders) {
+			long lookupT0 = trace ? System.nanoTime() : 0;
 			Collection<ICSSPropertyHandler> handlers = provider.getCSSPropertyHandlers(element, property);
+			if (trace) {
+				CSSCorePolicy.handlerLookupNs.addAndGet(System.nanoTime() - lookupT0);
+				CSSCorePolicy.handlerLookupCount.incrementAndGet();
+			}
 			if (handlers == null) {
 				continue;
 			}
 			for (ICSSPropertyHandler handler : handlers) {
 				try {
+					long invokeT0 = trace ? System.nanoTime() : 0;
 					boolean result = handler.applyCSSProperty(element, property, value, pseudo, this);
+					if (trace) {
+						CSSCorePolicy.handlerInvokeNs.addAndGet(System.nanoTime() - invokeT0);
+						CSSCorePolicy.handlerInvokeCount.incrementAndGet();
+					}
 					if (result) {
 						// Add CSS Property to flag that this CSS Property was
 						// applied.
@@ -1064,8 +1149,16 @@ public abstract class CSSEngineImpl implements CSSEngine {
 
 	@Override
 	public void reset() {
-		// Remove All Style Sheets
-		documentCSS.removeAllStyleSheets();
+		final boolean trace = CSSCorePolicy.DEBUG_PERF;
+		long t0 = trace ? System.nanoTime() : 0;
+		try {
+			documentCSS.removeAllStyleSheets();
+		} finally {
+			if (trace) {
+				CSSCorePolicy.resetNs.addAndGet(System.nanoTime() - t0);
+				CSSCorePolicy.resetCount.incrementAndGet();
+			}
+		}
 	}
 
 	/*--------------- Resources Registry -----------------*/

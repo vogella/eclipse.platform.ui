@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.eclipse.e4.ui.css.core.dom.ExtendedCSSRule;
 import org.eclipse.e4.ui.css.core.dom.ExtendedDocumentCSS;
+import org.eclipse.e4.ui.css.core.impl.engine.CSSCorePolicy;
 import org.eclipse.e4.ui.css.core.impl.engine.selector.SelectorMatcher;
 import org.eclipse.e4.ui.css.core.impl.engine.selector.Selectors;
 import org.w3c.dom.Element;
@@ -110,6 +111,20 @@ public class ViewCSSImpl implements ViewCSS, ExtendedDocumentCSS.StyleSheetChang
 	}
 
 	private CSSStyleDeclaration getComputedStyle(List<CSSRule> ruleList, Element elt, String pseudoElt) {
+		final boolean trace = CSSCorePolicy.DEBUG_PERF;
+		long t0 = trace ? System.nanoTime() : 0;
+		try {
+			return getComputedStyleInternal(ruleList, elt, pseudoElt, trace);
+		} finally {
+			if (trace) {
+				CSSCorePolicy.getComputedStyleNs.addAndGet(System.nanoTime() - t0);
+				CSSCorePolicy.getComputedStyleCount.incrementAndGet();
+			}
+		}
+	}
+
+	private CSSStyleDeclaration getComputedStyleInternal(List<CSSRule> ruleList, Element elt, String pseudoElt,
+			boolean trace) {
 		List<StyleWrapper> styleDeclarations = null;
 		StyleWrapper firstStyleDeclaration = null;
 		int position = 0;
@@ -132,7 +147,13 @@ public class ViewCSSImpl implements ViewCSS, ExtendedDocumentCSS.StyleSheetChang
 			ExtendedCSSRule r = (ExtendedCSSRule) rule;
 			Selectors.SelectorList selectorList = r.getSelectorList();
 			for (Selectors.Selector selector : selectorList.alternatives()) {
-				if (SelectorMatcher.matches(selector, elt, pseudoElt, hierarchy, 0)) {
+				long m0 = trace ? System.nanoTime() : 0;
+				boolean matched = SelectorMatcher.matches(selector, elt, pseudoElt, hierarchy, 0);
+				if (trace) {
+					CSSCorePolicy.selectorMatchNs.addAndGet(System.nanoTime() - m0);
+					CSSCorePolicy.selectorMatchCount.incrementAndGet();
+				}
+				if (matched) {
 					CSSStyleDeclaration style = styleRule.getStyle();
 					int specificity = selector.specificity();
 					StyleWrapper wrapper = new StyleWrapper(style, specificity, position++);
