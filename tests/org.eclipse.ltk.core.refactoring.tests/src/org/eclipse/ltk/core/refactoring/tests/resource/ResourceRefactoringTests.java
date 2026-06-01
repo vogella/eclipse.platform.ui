@@ -49,7 +49,10 @@ import org.eclipse.ltk.core.refactoring.RefactoringContribution;
 import org.eclipse.ltk.core.refactoring.RefactoringCore;
 import org.eclipse.ltk.core.refactoring.RefactoringDescriptor;
 import org.eclipse.ltk.core.refactoring.RefactoringStatus;
+import org.eclipse.ltk.core.refactoring.participants.ReorgExecutionLog;
 import org.eclipse.ltk.core.refactoring.resource.CopyProjectDescriptor;
+import org.eclipse.ltk.core.refactoring.resource.CopyResourceChange;
+import org.eclipse.ltk.core.refactoring.resource.CopyResourcesDescriptor;
 import org.eclipse.ltk.core.refactoring.resource.DeleteResourcesDescriptor;
 import org.eclipse.ltk.core.refactoring.resource.MoveRenameResourceDescriptor;
 import org.eclipse.ltk.core.refactoring.resource.MoveResourceChange;
@@ -300,6 +303,225 @@ public class ResourceRefactoringTests {
 	}
 
 	@Test
+	void testCopyChangeFile() throws Exception {
+		String content= "hello";
+
+		IFolder testFolder= fProject.createFolder("test");
+		IFile file= fProject.createFile(testFolder, "myFile.txt", content);
+		IFolder destination= fProject.createFolder("dest");
+		ReorgExecutionLog log = new ReorgExecutionLog();
+
+		Change undoChange= perform(new CopyResourceChange(file, log, destination));
+
+		IResource copiedResource= assertCopy(file, log, destination);
+
+		perform(undoChange);
+
+		assertFalse(copiedResource.exists());
+	}
+
+	@Test
+	void testCopyChangeFolder() throws Exception {
+		String content= "hello";
+
+		IFolder testFolder= fProject.createFolder("test");
+		fProject.createFile(testFolder, "myFile.txt", content);
+		IFolder destination= fProject.createFolder("dest");
+		ReorgExecutionLog log = new ReorgExecutionLog();
+
+		Change undoChange= perform(new CopyResourceChange(testFolder, log, destination));
+
+		IFolder copiedResource= (IFolder) assertCopy(testFolder, log, destination);
+		assertTrue(copiedResource.getFile("myFile.txt").exists());
+
+		perform(undoChange);
+
+		assertFalse(copiedResource.exists());
+		assertTrue(testFolder.getFile("myFile.txt").exists());
+	}
+
+	@Test
+	void testCopyChangeOverwrite() throws Exception {
+		String content1= "hello";
+		String content2= "world";
+
+		IFolder testFolder= fProject.createFolder("test");
+		IFile file1= fProject.createFile(testFolder, "myFile.txt", content1);
+
+		IFolder destination= fProject.createFolder("dest");
+		IFile file2= fProject.createFile(destination, "myFile.txt", content2);
+
+		ReorgExecutionLog log = new ReorgExecutionLog();
+
+		Change undoChange= perform(new CopyResourceChange(file1, log, destination));
+
+		assertCopy(file1, log, destination);
+
+		perform(undoChange);
+
+		assertEquals(content2, fProject.getContent(file2));
+	}
+
+	@Test
+	void testCopyRefactoringFile() throws Exception {
+		String content= "hello";
+
+		IFolder testFolder= fProject.createFolder("test");
+		IFile file= fProject.createFile(testFolder, "myFile.txt", content);
+
+		IFolder destination= fProject.createFolder("dest");
+
+		RefactoringContribution contribution= RefactoringCore.getRefactoringContribution(CopyResourcesDescriptor.ID);
+		CopyResourcesDescriptor descriptor= (CopyResourcesDescriptor) contribution.createDescriptor();
+		ReorgExecutionLog log = new ReorgExecutionLog();
+
+		descriptor.setResources(new IResource[] { file });
+		descriptor.setDestinationPaths(new IPath[] { destination.getFullPath().append("myFile.txt") });
+
+		Change undoChange= perform(descriptor);
+
+		IResource copiedResource= assertCopy(file, log, destination);
+
+		perform(undoChange);
+
+		assertFalse(copiedResource.exists());
+	}
+
+	@Test
+	void testCopyRefactoringFolder() throws Exception {
+		String content= "hello";
+
+		IFolder testFolder= fProject.createFolder("test");
+		fProject.createFile(testFolder, "myFile.txt", content);
+		IFolder destination= fProject.createFolder("dest");
+
+		RefactoringContribution contribution= RefactoringCore.getRefactoringContribution(CopyResourcesDescriptor.ID);
+		CopyResourcesDescriptor descriptor= (CopyResourcesDescriptor) contribution.createDescriptor();
+		ReorgExecutionLog log = new ReorgExecutionLog();
+
+		descriptor.setResources(new IResource[] { testFolder });
+		descriptor.setDestinationPaths(new IPath[] { destination.getFullPath().append("test") });
+
+		Change undoChange= perform(descriptor);
+
+		IFolder copiedResource= (IFolder) assertCopy(testFolder, log, destination);
+		assertTrue(copiedResource.getFile("myFile.txt").exists());
+
+		perform(undoChange);
+
+		assertFalse(copiedResource.exists());
+		assertTrue(testFolder.getFile("myFile.txt").exists());
+	}
+
+	@Test
+	void testCopyRefactoringOverwrite() throws Exception {
+		String content1= "hello";
+		String content2= "world";
+
+		IFolder testFolder= fProject.createFolder("test");
+		IFile file1= fProject.createFile(testFolder, "myFile.txt", content1);
+
+		IFolder destination= fProject.createFolder("dest");
+		IFile file2= fProject.createFile(destination, "myFile.txt", content2);
+
+		RefactoringContribution contribution= RefactoringCore.getRefactoringContribution(CopyResourcesDescriptor.ID);
+		CopyResourcesDescriptor descriptor= (CopyResourcesDescriptor) contribution.createDescriptor();
+		ReorgExecutionLog log = new ReorgExecutionLog();
+
+		descriptor.setResources(new IResource[] { file1 });
+		descriptor.setDestinationPaths(new IPath[] { destination.getFullPath().append("myFile.txt") });
+
+		Change undoChange= perform(descriptor);
+
+		assertCopy(file1, log, destination);
+
+		perform(undoChange);
+
+		assertEquals(content2, fProject.getContent(file2));
+	}
+
+	@Test
+	void testCopyRenameRefactoringFile() throws Exception {
+		String content= "hello";
+
+		IFolder testFolder= fProject.createFolder("test");
+		IFile file= fProject.createFile(testFolder, "myFile.txt", content);
+
+		IFolder destination= fProject.createFolder("dest");
+
+		RefactoringContribution contribution= RefactoringCore.getRefactoringContribution(CopyResourcesDescriptor.ID);
+		CopyResourcesDescriptor descriptor= (CopyResourcesDescriptor) contribution.createDescriptor();
+		ReorgExecutionLog log = new ReorgExecutionLog();
+		log.setNewName(file, "newNameFile.txt");
+
+		descriptor.setResources(new IResource[] { file });
+		descriptor.setDestinationPaths(new IPath[] { destination.getFullPath().append("newNameFile.txt") });
+
+		Change undoChange= perform(descriptor);
+
+		IResource copiedResource= assertCopy(file, log, destination);
+
+		perform(undoChange);
+
+		assertFalse(copiedResource.exists());
+	}
+
+	@Test
+	void testCopyRenameRefactoringFolder() throws Exception {
+		String content= "hello";
+
+		IFolder testFolder= fProject.createFolder("test");
+		fProject.createFile(testFolder, "myFile.txt", content);
+		IFolder destination= fProject.createFolder("dest");
+
+		RefactoringContribution contribution= RefactoringCore.getRefactoringContribution(CopyResourcesDescriptor.ID);
+		CopyResourcesDescriptor descriptor= (CopyResourcesDescriptor) contribution.createDescriptor();
+		ReorgExecutionLog log = new ReorgExecutionLog();
+		log.setNewName(testFolder, "newNameFolder");
+
+		descriptor.setResources(new IResource[] { testFolder });
+		descriptor.setDestinationPaths(new IPath[] { destination.getFullPath().append("newNameFolder") });
+
+		Change undoChange= perform(descriptor);
+
+		IFolder copiedResource= (IFolder) assertCopy(testFolder, log, destination);
+		assertTrue(copiedResource.getFile("myFile.txt").exists());
+
+		perform(undoChange);
+
+		assertFalse(copiedResource.exists());
+		assertTrue(testFolder.getFile("myFile.txt").exists());
+	}
+
+	@Test
+	void testCopyRenameRefactoringOverwrite() throws Exception {
+		String content1= "hello";
+		String content2= "world";
+
+		IFolder testFolder= fProject.createFolder("test");
+		IFile file1= fProject.createFile(testFolder, "myFile.txt", content1);
+
+		IFolder destination= fProject.createFolder("dest");
+		IFile file2= fProject.createFile(destination, "myFile2.txt", content2);
+
+		RefactoringContribution contribution= RefactoringCore.getRefactoringContribution(CopyResourcesDescriptor.ID);
+		CopyResourcesDescriptor descriptor= (CopyResourcesDescriptor) contribution.createDescriptor();
+		ReorgExecutionLog log = new ReorgExecutionLog();
+		log.setNewName(file1, "myFile2.txt");
+
+		descriptor.setResources(new IResource[] { file1 });
+		descriptor.setDestinationPaths(new IPath[] { destination.getFullPath().append("myFile2.txt") });
+
+		Change undoChange= perform(descriptor);
+
+		assertCopy(file1, log, destination);
+
+		perform(undoChange);
+
+		assertEquals(content2, fProject.getContent(file2));
+	}
+
+	@Test
 	public void testDeleteRefactoring1_bug343584() throws Exception {
 		IFolder testFolder= fProject.createFolder("test");
 		fProject.createFile(testFolder, "myFile.txt", "hello");
@@ -453,6 +675,24 @@ public class ResourceRefactoringTests {
 
 		if (res instanceof IFile) {
 			assertEquals(content, fProject.getContent((IFile) res));
+		}
+		return res;
+	}
+
+	private IResource assertCopy(IResource source, ReorgExecutionLog log, IContainer destination) throws CoreException, IOException {
+		String newName = log.getNewName(source);
+		if (newName == null) {
+			newName = source.getName();
+		}
+
+		IResource res= destination.findMember(newName);
+
+		assertTrue(source.exists());
+		assertNotNull(res);
+		assertEquals(res.getType(), source.getType());
+
+		if (source instanceof IFile file) {
+			assertEquals(fProject.getContent(file), fProject.getContent((IFile) res));
 		}
 		return res;
 	}

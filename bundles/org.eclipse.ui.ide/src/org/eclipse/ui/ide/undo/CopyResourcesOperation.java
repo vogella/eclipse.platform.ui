@@ -145,7 +145,6 @@ public class CopyResourcesOperation extends
 	 */
 	protected void copy(IProgressMonitor monitor, IAdaptable uiInfo)
 			throws CoreException {
-
 		SubMonitor subMonitor = SubMonitor.convert(monitor,
 				resources.length + (resourceDescriptions != null ? resourceDescriptions.length : 0));
 		subMonitor.setTaskName(UndoMessages.AbstractResourcesOperation_CopyingResourcesProgress);
