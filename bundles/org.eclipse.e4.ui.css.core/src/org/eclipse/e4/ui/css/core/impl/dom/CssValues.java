@@ -32,9 +32,14 @@ import org.w3c.dom.css.Rect;
  * <p>
  * Consumers pattern-match on the record variants ({@link CssNumber},
  * {@link CssDimension}, {@link CssText}, {@link CssColor}, {@link CssList})
- * and read their components. The variants still implement the W3C DOM-CSS
- * interfaces as a transitional bridge; the bridge goes away once the
- * computed-style cascade is internal as well.
+ * and read their components. The variants deliberately keep implementing the
+ * W3C DOM-CSS value interfaces: {@code IStylingEngine.getStyle} and
+ * {@code IThemeEngine.getStyle} are frozen public API returning a W3C
+ * {@code CSSStyleDeclaration}, whose {@code getPropertyCSSValue} hands these
+ * values to external callers, and downstream handlers contributed through the
+ * {@code propertyHandler} extension point receive them as W3C
+ * {@code CSSValue}. The W3C interfaces are that compatibility surface;
+ * everything inside the engine reads the records.
  * </p>
  */
 public final class CssValues {
