@@ -24,9 +24,10 @@ package org.eclipse.e4.ui.css.core.impl.engine;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.Reader;
-import java.io.StringReader;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -40,13 +41,8 @@ import org.eclipse.core.runtime.FileLocator;
 import org.eclipse.core.runtime.IPath;
 import org.eclipse.e4.ui.css.core.dom.CSSStylableElement;
 import org.eclipse.e4.ui.css.core.dom.ChildVisibilityAwareElement;
-import org.eclipse.e4.ui.css.core.dom.ExtendedCSSRule;
-import org.eclipse.e4.ui.css.core.dom.ExtendedDocumentCSS;
 import org.eclipse.e4.ui.css.core.dom.IElementProvider;
 import org.eclipse.e4.ui.css.core.dom.IStreamingNodeList;
-import org.eclipse.e4.ui.css.core.dom.parsers.CSSParser;
-import org.eclipse.e4.ui.css.core.dom.parsers.CSSParserFactory;
-import org.eclipse.e4.ui.css.core.dom.parsers.ICSSParserFactory;
 import org.eclipse.e4.ui.css.core.dom.properties.ICSSPropertyCompositeHandler;
 import org.eclipse.e4.ui.css.core.dom.properties.ICSSPropertyHandler;
 import org.eclipse.e4.ui.css.core.dom.properties.ICSSPropertyHandlerProvider;
@@ -58,11 +54,13 @@ import org.eclipse.e4.ui.css.core.engine.CSSElementContext;
 import org.eclipse.e4.ui.css.core.engine.CSSEngine;
 import org.eclipse.e4.ui.css.core.engine.CSSErrorHandler;
 import org.eclipse.e4.ui.css.core.exceptions.UnsupportedPropertyException;
-import org.eclipse.e4.ui.css.core.impl.dom.CSSRuleListImpl;
+import org.eclipse.e4.ui.css.core.impl.dom.CSSComputedStyleImpl;
+import org.eclipse.e4.ui.css.core.impl.dom.CSSImportRuleImpl;
+import org.eclipse.e4.ui.css.core.impl.dom.CSSStyleDeclarationImpl;
+import org.eclipse.e4.ui.css.core.impl.dom.CSSStyleRuleImpl;
 import org.eclipse.e4.ui.css.core.impl.dom.CSSStyleSheetImpl;
-import org.eclipse.e4.ui.css.core.impl.dom.DocumentCSSImpl;
-import org.eclipse.e4.ui.css.core.impl.dom.ViewCSSImpl;
-import org.eclipse.e4.ui.css.core.impl.engine.selector.SacTranslator;
+import org.eclipse.e4.ui.css.core.impl.dom.CssRule;
+import org.eclipse.e4.ui.css.core.impl.dom.StyleWrapper;
 import org.eclipse.e4.ui.css.core.impl.engine.selector.SelectorMatcher;
 import org.eclipse.e4.ui.css.core.impl.engine.selector.Selectors;
 import org.eclipse.e4.ui.css.core.resources.IResourcesRegistry;
@@ -70,25 +68,16 @@ import org.eclipse.e4.ui.css.core.resources.ResourceRegistryKeyFactory;
 import org.eclipse.e4.ui.css.core.util.impl.resources.ResourcesLocatorManager;
 import org.eclipse.e4.ui.css.core.util.resources.IResourcesLocatorManager;
 import org.eclipse.e4.ui.css.core.utils.StringUtils;
-import org.apache.batik.css.parser.DefaultConditionFactory;
-import org.apache.batik.css.parser.DefaultSelectorFactory;
-import org.w3c.css.sac.InputSource;
+import org.eclipse.e4.ui.css.core.impl.parser.CssParser;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
-import org.w3c.dom.css.CSSImportRule;
-import org.w3c.dom.css.CSSRule;
-import org.w3c.dom.css.CSSRuleList;
 import org.w3c.dom.css.CSSStyleDeclaration;
-import org.w3c.dom.css.CSSStyleSheet;
 import org.w3c.dom.css.CSSValue;
-import org.w3c.dom.css.DocumentCSS;
-import org.w3c.dom.css.ViewCSS;
-import org.w3c.dom.stylesheets.StyleSheet;
 
 /**
- * Abstract CSS Engine manage style sheet parsing and store the
- * {@link CSSStyleSheet} into {@link DocumentCSS}.
+ * Abstract CSS Engine which manages stylesheet parsing, the cascade, and
+ * applying styles.
  *
  * To apply styles, call the {@link #applyStyles(Object, boolean, boolean)}
  * method. This method check if {@link ICSSPropertyHandler} is registered for
@@ -110,15 +99,11 @@ public abstract class CSSEngineImpl implements CSSEngine {
 	 */
 	private static final IResourcesLocatorManager defaultResourcesLocatorManager = ResourcesLocatorManager.INSTANCE;
 
-	/**
-	 * w3c {@link DocumentCSS}.
-	 */
-	private final ExtendedDocumentCSS documentCSS;
+	/** The stylesheets added to this engine, in registration order. */
+	private final List<CSSStyleSheetImpl> styleSheets = new ArrayList<>();
 
-	/**
-	 * w3c {@link ViewCSS}.
-	 */
-	private final ViewCSS viewCSS;
+	/** Cached flat list of style rules over all stylesheets. */
+	private List<CSSStyleRuleImpl> combinedRules;
 
 	/**
 	 * {@link IElementProvider} used to retrieve w3c Element linked to the
@@ -161,12 +146,6 @@ public abstract class CSSEngineImpl implements CSSEngine {
 	private CSSPropertyHandlerLazyProviderImpl lazyHandlerProvider;
 
 	public CSSEngineImpl() {
-		this(new DocumentCSSImpl());
-	}
-
-	public CSSEngineImpl(ExtendedDocumentCSS documentCSS) {
-		this.documentCSS = documentCSS;
-		this.viewCSS = new ViewCSSImpl(documentCSS);
 		keyFactory = new ResourceRegistryKeyFactory();
 		registerCSSValueConverter(CSSValueBooleanConverterImpl.INSTANCE);
 	}
@@ -174,50 +153,57 @@ public abstract class CSSEngineImpl implements CSSEngine {
 	/*--------------- Parse style sheet -----------------*/
 
 	@Override
-	public StyleSheet parseStyleSheet(Reader reader) throws IOException {
-		InputSource source = new InputSource();
-		source.setCharacterStream(reader);
-		return parseStyleSheet(source);
+	public CSSStyleSheetImpl parseStyleSheet(Reader reader) throws IOException {
+		return parseStyleSheet(readFully(reader), null);
 	}
 
 	@Override
-	public StyleSheet parseStyleSheet(InputStream stream) throws IOException {
-		InputSource source = new InputSource();
-		source.setByteStream(stream);
-		return parseStyleSheet(source);
+	public CSSStyleSheetImpl parseStyleSheet(InputStream stream) throws IOException {
+		return parseStyleSheet(stream, null);
 	}
 
 	@Override
-	public StyleSheet parseStyleSheet(InputSource source) throws IOException {
-		// Check that CharacterStream or ByteStream is not null
-		checkInputSource(source);
-		CSSParser parser = makeCSSParser();
-		CSSStyleSheet styleSheet = parser.parseStyleSheet(source);
+	public CSSStyleSheetImpl parseStyleSheet(InputStream stream, String uri) throws IOException {
+		return parseStyleSheet(readFully(new InputStreamReader(stream, StandardCharsets.UTF_8)), uri);
+	}
 
-		CSSRuleList rules = styleSheet.getCssRules();
-		int length = rules.getLength();
-		CSSRuleListImpl masterList = new CSSRuleListImpl();
+	private CSSStyleSheetImpl parseStyleSheet(String content, String uri) throws IOException {
+		final boolean trace = CSSCorePolicy.DEBUG_PERF;
+		long t0 = trace ? System.nanoTime() : 0;
+		try {
+			return parseStyleSheetInternal(content, uri);
+		} finally {
+			if (trace) {
+				CSSCorePolicy.parseStyleSheetNs.addAndGet(System.nanoTime() - t0);
+				CSSCorePolicy.parseStyleSheetCount.incrementAndGet();
+			}
+		}
+	}
+
+	private CSSStyleSheetImpl parseStyleSheetInternal(String content, String uri) throws IOException {
+		CSSStyleSheetImpl styleSheet = CssParser.parseStyleSheet(content);
+
+		List<CssRule> rules = styleSheet.getRules();
+		List<CssRule> masterList = new ArrayList<>();
 		int counter;
-		for (counter = 0; counter < length; counter++) {
-			CSSRule rule = rules.item(counter);
-			if (rule.getType() != CSSRule.IMPORT_RULE) {
+		for (counter = 0; counter < rules.size(); counter++) {
+			if (!(rules.get(counter) instanceof CSSImportRuleImpl importRule)) {
 				break;
 			}
 			// processing an import CSS
-			CSSImportRule importRule = (CSSImportRule) rule;
 			URL url = null;
 			if (importRule.getHref().startsWith("platform")) {
 				url = FileLocator.resolve(new URL(importRule.getHref()));
 			} else {
-				IPath p = IPath.fromOSString(source.getURI());
+				IPath p = IPath.fromOSString(uri);
 				IPath trim = p.removeLastSegments(1);
-				boolean isArchive = source.getURI().contains(ARCHIVE_IDENTIFIER);
+				boolean isArchive = uri.contains(ARCHIVE_IDENTIFIER);
 				url = FileLocator
-						.resolve(new URL(trim.addTrailingSeparator().toString() + ((CSSImportRule) rule).getHref()));
+						.resolve(new URL(trim.addTrailingSeparator().toString() + importRule.getHref()));
 				File testFile = new File(url.getFile());
 				if (!isArchive&&!testFile.exists()) {
 					// look in platform default
-					String path = getResourcesLocatorManager().resolve((importRule).getHref());
+					String path = getResourcesLocatorManager().resolve(importRule.getHref());
 					testFile = new File(new URL(path).getFile());
 					if (testFile.exists()) {
 						url = new URL(path);
@@ -225,34 +211,38 @@ public abstract class CSSEngineImpl implements CSSEngine {
 				}
 			}
 			try (InputStream stream = url.openStream()) {
-				InputSource tempStream = new InputSource();
-				tempStream.setURI(url.toString());
-				tempStream.setByteStream(stream);
 				parseImport++;
+				CSSStyleSheetImpl imported;
 				try {
-					styleSheet = (CSSStyleSheet) this.parseStyleSheet(tempStream);
+					imported = parseStyleSheet(
+							readFully(new InputStreamReader(stream, StandardCharsets.UTF_8)), url.toString());
 				} finally {
 					parseImport--;
 				}
-				CSSRuleList tempRules = styleSheet.getCssRules();
-				for (int j = 0; j < tempRules.getLength(); j++) {
-					masterList.add(tempRules.item(j));
-				}
+				masterList.addAll(imported.getRules());
 			}
 		}
 
 		// add remaining non import rules
-		for (int i = counter; i < length; i++) {
-			masterList.add(rules.item(i));
-		}
+		masterList.addAll(rules.subList(counter, rules.size()));
 
 		// final stylesheet
-		CSSStyleSheetImpl s = new CSSStyleSheetImpl();
-		s.setRuleList(masterList);
+		CSSStyleSheetImpl s = new CSSStyleSheetImpl(masterList);
 		if (parseImport == 0) {
-			documentCSS.addStyleSheet(s);
+			addStyleSheet(s);
 		}
 		return s;
+	}
+
+	/** Register a parsed stylesheet with this engine's cascade. */
+	public void addStyleSheet(CSSStyleSheetImpl styleSheet) {
+		styleSheets.add(styleSheet);
+		combinedRules = null;
+	}
+
+	/** The stylesheets registered with this engine, in registration order. */
+	public List<CSSStyleSheetImpl> getStyleSheets() {
+		return Collections.unmodifiableList(styleSheets);
 	}
 
 	private void processNodeList(NodeList nodes, BiConsumer<Node, Boolean> consumer, boolean applyStylesToChildNodes) {
@@ -268,112 +258,65 @@ public abstract class CSSEngineImpl implements CSSEngine {
 		}
 	}
 
-	/**
-	 * Return true if <code>source</code> is valid and false otherwise.
-	 */
-	private void checkInputSource(InputSource source) throws IOException {
-		Reader reader = source.getCharacterStream();
-		InputStream stream = source.getByteStream();
-		if (reader == null && stream == null) {
-			throw new IOException(
-					"CharacterStream or ByteStream cannot be null for the InputSource.");
+	private static String readFully(Reader reader) throws IOException {
+		StringBuilder sb = new StringBuilder();
+		char[] buffer = new char[4096];
+		int read;
+		while ((read = reader.read(buffer)) != -1) {
+			sb.append(buffer, 0, read);
 		}
+		return sb.toString();
 	}
 
 	/*--------------- Parse style declaration -----------------*/
 
 	@Override
 	public CSSStyleDeclaration parseStyleDeclaration(String style) {
-		try {
-			return parseStyleDeclaration(new StringReader(style));
-		} catch (IOException e) {
-			throw new IllegalStateException("StringReader cannot throw IOException", e); //$NON-NLS-1$
-		}
+		return CssParser.parseStyleDeclaration(style);
 	}
 
 	@Override
 	public CSSStyleDeclaration parseStyleDeclaration(Reader reader) throws IOException {
-		InputSource source = new InputSource();
-		source.setCharacterStream(reader);
-		return parseStyleDeclaration(source);
+		return CssParser.parseStyleDeclaration(readFully(reader));
 	}
 
 	@Override
 	public CSSStyleDeclaration parseStyleDeclaration(InputStream stream) throws IOException {
-		InputSource source = new InputSource();
-		source.setByteStream(stream);
-		return parseStyleDeclaration(source);
-	}
-
-	@Override
-	public CSSStyleDeclaration parseStyleDeclaration(InputSource source) throws IOException {
-		checkInputSource(source);
-		CSSParser parser = makeCSSParser();
-		return parser.parseStyleDeclaration(source);
+		return CssParser.parseStyleDeclaration(readFully(new InputStreamReader(stream, StandardCharsets.UTF_8)));
 	}
 
 	/*--------------- Parse CSS Selector -----------------*/
 
 	@Override
 	public Selectors.SelectorList parseSelectors(String selector) {
-		try {
-			return parseSelectors(new StringReader(selector));
-		} catch (IOException e) {
-			throw new IllegalStateException("StringReader cannot throw IOException", e); //$NON-NLS-1$
-		}
+		return CssParser.parseSelectors(selector);
 	}
 
 	@Override
 	public Selectors.SelectorList parseSelectors(Reader reader) throws IOException {
-		InputSource source = new InputSource();
-		source.setCharacterStream(reader);
-		return parseSelectors(source);
+		return CssParser.parseSelectors(readFully(reader));
 	}
 
 	@Override
 	public Selectors.SelectorList parseSelectors(InputStream stream) throws IOException {
-		InputSource source = new InputSource();
-		source.setByteStream(stream);
-		return parseSelectors(source);
-	}
-
-	@Override
-	public Selectors.SelectorList parseSelectors(InputSource source) throws IOException {
-		checkInputSource(source);
-		CSSParser parser = makeCSSParser();
-		return SacTranslator.translate(parser.parseSelectors(source));
+		return CssParser.parseSelectors(readFully(new InputStreamReader(stream, StandardCharsets.UTF_8)));
 	}
 
 	/*--------------- Parse CSS Property Value-----------------*/
 
 	@Override
 	public CSSValue parsePropertyValue(Reader reader) throws IOException {
-		InputSource source = new InputSource();
-		source.setCharacterStream(reader);
-		return parsePropertyValue(source);
+		return CssParser.parsePropertyValue(readFully(reader));
 	}
 
 	@Override
 	public CSSValue parsePropertyValue(InputStream stream) throws IOException {
-		InputSource source = new InputSource();
-		source.setByteStream(stream);
-		return parsePropertyValue(source);
+		return CssParser.parsePropertyValue(readFully(new InputStreamReader(stream, StandardCharsets.UTF_8)));
 	}
 
 	@Override
 	public CSSValue parsePropertyValue(String value) {
-		try {
-			return parsePropertyValue(new StringReader(value));
-		} catch (IOException e) {
-			throw new IllegalStateException("StringReader cannot throw IOException", e); //$NON-NLS-1$
-		}
-	}
-
-	@Override
-	public CSSValue parsePropertyValue(InputSource source) throws IOException {
-		checkInputSource(source);
-		CSSParser parser = makeCSSParser();
-		return parser.parsePropertyValue(source);
+		return CssParser.parsePropertyValue(value);
 	}
 
 	/*--------------- Apply styles -----------------*/
@@ -407,9 +350,30 @@ public abstract class CSSEngineImpl implements CSSEngine {
 
 	@Override
 	public void applyStyles(Object element, boolean applyStylesToChildNodes, boolean computeDefaultStyle) {
+		final boolean trace = CSSCorePolicy.DEBUG_PERF;
+		long t0 = trace ? System.nanoTime() : 0;
+		try {
+			applyStylesInternal(element, applyStylesToChildNodes, computeDefaultStyle);
+		} finally {
+			if (trace) {
+				CSSCorePolicy.applyStylesNs.addAndGet(System.nanoTime() - t0);
+				CSSCorePolicy.applyStylesCount.incrementAndGet();
+			}
+		}
+	}
+
+	private void applyStylesInternal(Object element, boolean applyStylesToChildNodes, boolean computeDefaultStyle) {
+		final boolean trace = CSSCorePolicy.DEBUG_PERF;
+		long entryT0 = trace ? System.nanoTime() : 0;
 		Element elt = getElement(element);
 		if (elt == null || !isVisible(elt)) {
+			if (trace) {
+				CSSCorePolicy.applyStylesEntryNs.addAndGet(System.nanoTime() - entryT0);
+			}
 			return;
+		}
+		if (trace) {
+			CSSCorePolicy.applyStylesEntryNs.addAndGet(System.nanoTime() - entryT0);
 		}
 
 		if (isElementStyled(element)) {
@@ -430,7 +394,7 @@ public abstract class CSSEngineImpl implements CSSEngine {
 		/*
 		 * Compute new Style to apply.
 		 */
-		CSSStyleDeclaration style = viewCSS.getComputedStyle(elt, null);
+		CSSStyleDeclaration style = computeStyle(elt, null);
 		if (computeDefaultStyle) {
 			if (applyStylesToChildNodes) {
 				this.computeDefaultStyle = computeDefaultStyle;
@@ -444,12 +408,13 @@ public abstract class CSSEngineImpl implements CSSEngine {
 		/*
 		 * Manage static pseudo instances
 		 */
+		long pseudoT0 = trace ? System.nanoTime() : 0;
 		String[] pseudoInstances = getStaticPseudoInstances(elt);
 		if (pseudoInstances != null && pseudoInstances.length > 0) {
 			// there are static pseudo instances defined, loop for it and
 			// apply styles for each pseudo instance.
 			for (String pseudoInstance : pseudoInstances) {
-				CSSStyleDeclaration styleWithPseudoInstance = viewCSS.getComputedStyle(elt, pseudoInstance);
+				CSSStyleDeclaration styleWithPseudoInstance = computeStyle(elt, pseudoInstance);
 				if (computeDefaultStyle) {
 					/*
 					 * Apply default style for the current pseudo instance.
@@ -458,27 +423,38 @@ public abstract class CSSEngineImpl implements CSSEngine {
 				}
 
 				if (styleWithPseudoInstance != null) {
-					CSSRule parentRule = styleWithPseudoInstance.getParentRule();
-					if (parentRule instanceof ExtendedCSSRule) {
-						applyConditionalPseudoStyle((ExtendedCSSRule) parentRule, pseudoInstance, element, styleWithPseudoInstance);
+					CSSStyleRuleImpl parentRule = styleWithPseudoInstance instanceof CSSStyleDeclarationImpl declaration
+							? declaration.getParentStyleRule()
+							: null;
+					if (parentRule != null) {
+						applyConditionalPseudoStyle(parentRule, pseudoInstance, element, styleWithPseudoInstance);
 					} else {
 						applyStyleDeclaration(elt, styleWithPseudoInstance, pseudoInstance);
 					}
 				}
 			}
 		}
+		if (trace) {
+			CSSCorePolicy.pseudoCascadeNs.addAndGet(System.nanoTime() - pseudoT0);
+		}
 
 		if (style != null) {
 			applyStyleDeclaration(elt, style, null);
 		}
+		long inlineT0 = trace ? System.nanoTime() : 0;
 		try {
 			// Apply inline style
 			applyInlineStyle(elt, false);
 		} catch (Exception e) {
 			handleExceptions(e);
 		}
+		if (trace) {
+			CSSCorePolicy.applyInlineStyleNs.addAndGet(System.nanoTime() - inlineT0);
+			CSSCorePolicy.applyInlineStyleCount.incrementAndGet();
+		}
 
 		if (applyStylesToChildNodes) {
+			long childT0 = trace ? System.nanoTime() : 0;
 			/*
 			 * Style all children recursive.
 			 */
@@ -489,6 +465,9 @@ public abstract class CSSEngineImpl implements CSSEngine {
 						processNodeList(nodes, this::applyStyles, applyStylesToChildNodes);
 						onStylesAppliedToChildNodes(elt, nodes);
 					}
+			if (trace) {
+				CSSCorePolicy.childRecursionNs.addAndGet(System.nanoTime() - childT0);
+			}
 		}
 	}
 
@@ -519,7 +498,7 @@ public abstract class CSSEngineImpl implements CSSEngine {
 		return true;
 	}
 
-	private void applyConditionalPseudoStyle(ExtendedCSSRule parentRule, String pseudoInstance, Object element,
+	private void applyConditionalPseudoStyle(CSSStyleRuleImpl parentRule, String pseudoInstance, Object element,
 			CSSStyleDeclaration styleWithPseudoInstance) {
 		Selectors.SelectorList selectorList = parentRule.getSelectorList();
 		for (Selectors.Selector alternative : selectorList.alternatives()) {
@@ -591,6 +570,19 @@ public abstract class CSSEngineImpl implements CSSEngine {
 
 	@Override
 	public void applyStyleDeclaration(Object element, CSSStyleDeclaration style, String pseudo) {
+		final boolean trace = CSSCorePolicy.DEBUG_PERF;
+		long t0 = trace ? System.nanoTime() : 0;
+		try {
+			applyStyleDeclarationInternal(element, style, pseudo);
+		} finally {
+			if (trace) {
+				CSSCorePolicy.applyStyleDeclarationNs.addAndGet(System.nanoTime() - t0);
+				CSSCorePolicy.applyStyleDeclarationCount.incrementAndGet();
+			}
+		}
+	}
+
+	private void applyStyleDeclarationInternal(Object element, CSSStyleDeclaration style, String pseudo) {
 		// Apply style
 		boolean avoidanceCacheInstalled = currentCSSPropertiesApplied == null;
 		if (avoidanceCacheInstalled) {
@@ -648,13 +640,6 @@ public abstract class CSSEngineImpl implements CSSEngine {
 	@Override
 	public CSSStyleDeclaration parseAndApplyStyleDeclaration(Object node, InputStream stream) throws IOException {
 		CSSStyleDeclaration style = parseStyleDeclaration(stream);
-		this.applyStyleDeclaration(node, style, null);
-		return style;
-	}
-
-	@Override
-	public CSSStyleDeclaration parseAndApplyStyleDeclaration(Object node, InputSource source) throws IOException {
-		CSSStyleDeclaration style = parseStyleDeclaration(source);
 		this.applyStyleDeclaration(node, style, null);
 		return style;
 	}
@@ -760,6 +745,20 @@ public abstract class CSSEngineImpl implements CSSEngine {
 	@Override
 	public ICSSPropertyHandler applyCSSProperty(Object element, String property, CSSValue value, String pseudo)
 			throws Exception {
+		final boolean trace = CSSCorePolicy.DEBUG_PERF;
+		long t0 = trace ? System.nanoTime() : 0;
+		try {
+			return applyCSSPropertyInternal(element, property, value, pseudo);
+		} finally {
+			if (trace) {
+				CSSCorePolicy.applyCSSPropertyNs.addAndGet(System.nanoTime() - t0);
+				CSSCorePolicy.applyCSSPropertyCount.incrementAndGet();
+			}
+		}
+	}
+
+	private ICSSPropertyHandler applyCSSPropertyInternal(Object element, String property, CSSValue value, String pseudo)
+			throws Exception {
 		if (currentCSSPropertiesApplied != null && currentCSSPropertiesApplied.containsKey(property)) {
 			// CSS Property was already applied, ignore it.
 			return null;
@@ -777,14 +776,25 @@ public abstract class CSSEngineImpl implements CSSEngine {
 			value = parsePropertyValue(parentValueString);
 		}
 
+		final boolean trace = CSSCorePolicy.DEBUG_PERF;
 		for (ICSSPropertyHandlerProvider provider : propertyHandlerProviders) {
+			long lookupT0 = trace ? System.nanoTime() : 0;
 			Collection<ICSSPropertyHandler> handlers = provider.getCSSPropertyHandlers(element, property);
+			if (trace) {
+				CSSCorePolicy.handlerLookupNs.addAndGet(System.nanoTime() - lookupT0);
+				CSSCorePolicy.handlerLookupCount.incrementAndGet();
+			}
 			if (handlers == null) {
 				continue;
 			}
 			for (ICSSPropertyHandler handler : handlers) {
 				try {
+					long invokeT0 = trace ? System.nanoTime() : 0;
 					boolean result = handler.applyCSSProperty(element, property, value, pseudo, this);
+					if (trace) {
+						CSSCorePolicy.handlerInvokeNs.addAndGet(System.nanoTime() - invokeT0);
+						CSSCorePolicy.handlerInvokeCount.incrementAndGet();
+					}
 					if (result) {
 						// Add CSS Property to flag that this CSS Property was
 						// applied.
@@ -1031,16 +1041,67 @@ public abstract class CSSEngineImpl implements CSSEngine {
 		this.resourcesLocatorManager = resourcesLocatorManager;
 	}
 
-	/*--------------- Document/View CSS -----------------*/
+	/*--------------- Computed style -----------------*/
 
 	@Override
-	public DocumentCSS getDocumentCSS() {
-		return documentCSS;
+	public CSSStyleDeclaration computeStyle(Element elt, String pseudoElt) {
+		List<StyleWrapper> styleDeclarations = null;
+		StyleWrapper firstStyleDeclaration = null;
+		int position = 0;
+
+		int depth = 0;
+		for (Node n = elt; n instanceof Element; n = n.getParentNode()) {
+			depth++;
+		}
+		Element[] hierarchy = new Element[depth];
+		int idx = 0;
+		for (Node n = elt; n instanceof Element; n = n.getParentNode()) {
+			hierarchy[idx++] = (Element) n;
+		}
+
+		for (CSSStyleRuleImpl rule : getCombinedRules()) {
+			for (Selectors.Selector selector : rule.getSelectorList().alternatives()) {
+				if (SelectorMatcher.matches(selector, elt, pseudoElt, hierarchy, 0)) {
+					int specificity = selector.specificity();
+					StyleWrapper wrapper = new StyleWrapper(rule.getStyle(), specificity, position++);
+					if (firstStyleDeclaration == null) {
+						firstStyleDeclaration = wrapper;
+					} else {
+						// There are several style declarations which match
+						// the current element
+						if (styleDeclarations == null) {
+							styleDeclarations = new ArrayList<>();
+							styleDeclarations.add(firstStyleDeclaration);
+						}
+						styleDeclarations.add(wrapper);
+					}
+				}
+			}
+		}
+		if (styleDeclarations != null) {
+			// There are several style declarations which match the element;
+			// merge the CSS property values.
+			return new CSSComputedStyleImpl(styleDeclarations);
+		}
+		if (firstStyleDeclaration != null) {
+			return firstStyleDeclaration.style();
+		}
+		return null;
 	}
 
-	@Override
-	public ViewCSS getViewCSS() {
-		return viewCSS;
+	private List<CSSStyleRuleImpl> getCombinedRules() {
+		if (combinedRules == null) {
+			List<CSSStyleRuleImpl> rules = new ArrayList<>();
+			for (CSSStyleSheetImpl styleSheet : styleSheets) {
+				for (CssRule rule : styleSheet.getRules()) {
+					if (rule instanceof CSSStyleRuleImpl styleRule) {
+						rules.add(styleRule);
+					}
+				}
+			}
+			combinedRules = rules;
+		}
+		return combinedRules;
 	}
 
 	@Override
@@ -1064,8 +1125,17 @@ public abstract class CSSEngineImpl implements CSSEngine {
 
 	@Override
 	public void reset() {
-		// Remove All Style Sheets
-		documentCSS.removeAllStyleSheets();
+		final boolean trace = CSSCorePolicy.DEBUG_PERF;
+		long t0 = trace ? System.nanoTime() : 0;
+		try {
+			styleSheets.clear();
+			combinedRules = null;
+		} finally {
+			if (trace) {
+				CSSCorePolicy.resetNs.addAndGet(System.nanoTime() - t0);
+				CSSCorePolicy.resetCount.incrementAndGet();
+			}
+		}
 	}
 
 	/*--------------- Resources Registry -----------------*/
@@ -1157,20 +1227,6 @@ public abstract class CSSEngineImpl implements CSSEngine {
 			return converter.convert(value, this, context);
 		}
 		return null;
-	}
-
-	/**
-	 * Return instance of CSS Parser, configured with Batik's stock selector
-	 * and condition factories. Selectors flow through {@link SacTranslator}
-	 * before they reach engine code, so we no longer need our vendored copies
-	 * of the SAC factory classes.
-	 */
-	public CSSParser makeCSSParser() {
-		ICSSParserFactory factory = CSSParserFactory.newInstance();
-		CSSParser parser = factory.makeCSSParser();
-		parser.setSelectorFactory(DefaultSelectorFactory.INSTANCE);
-		parser.setConditionFactory(DefaultConditionFactory.INSTANCE);
-		return parser;
 	}
 
 	public void registerCSSPropertyHandler(Class<?> cl, ICSSPropertyHandler handler) {

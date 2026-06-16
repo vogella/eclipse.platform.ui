@@ -20,17 +20,15 @@ import java.util.Collection;
 import org.eclipse.e4.ui.css.core.dom.IElementProvider;
 import org.eclipse.e4.ui.css.core.dom.properties.ICSSPropertyHandler;
 import org.eclipse.e4.ui.css.core.dom.properties.converters.ICSSValueConverter;
+import org.eclipse.e4.ui.css.core.impl.dom.CSSStyleSheetImpl;
 import org.eclipse.e4.ui.css.core.impl.engine.selector.Selectors;
 import org.eclipse.e4.ui.css.core.resources.IResourcesRegistry;
 import org.eclipse.e4.ui.css.core.util.resources.IResourcesLocatorManager;
-import org.w3c.css.sac.InputSource;
 import org.w3c.dom.Element;
 import org.w3c.dom.css.CSSStyleDeclaration;
-import org.w3c.dom.css.CSSStyleSheet;
 import org.w3c.dom.css.CSSValue;
-import org.w3c.dom.css.DocumentCSS;
 import org.w3c.dom.css.ViewCSS;
-import org.w3c.dom.stylesheets.StyleSheet;
+import org.w3c.dom.views.DocumentView;
 
 /**
  * CSS Engine interface used to parse style sheet and apply styles to something
@@ -43,17 +41,18 @@ public interface CSSEngine {
 	/**
 	 * Parse style sheet from Reader reader.
 	 */
-	StyleSheet parseStyleSheet(Reader reader) throws IOException;
+	CSSStyleSheetImpl parseStyleSheet(Reader reader) throws IOException;
 
 	/**
 	 * Parse style sheet from InputStream stream.
 	 */
-	StyleSheet parseStyleSheet(InputStream stream) throws IOException;
+	CSSStyleSheetImpl parseStyleSheet(InputStream stream) throws IOException;
 
 	/**
-	 * Parse style sheet from InputSource source.
+	 * Parse style sheet from InputStream stream, using {@code uri} as the base
+	 * location for resolving relative {@code @import} rules.
 	 */
-	StyleSheet parseStyleSheet(InputSource source) throws IOException;
+	CSSStyleSheetImpl parseStyleSheet(InputStream stream, String uri) throws IOException;
 
 	/*--------------- Parse style declaration -----------------*/
 
@@ -72,11 +71,6 @@ public interface CSSEngine {
 	 */
 	CSSStyleDeclaration parseStyleDeclaration(InputStream stream) throws IOException;
 
-	/**
-	 * Parse style declaration from InputSource source.
-	 */
-	CSSStyleDeclaration parseStyleDeclaration(InputSource source) throws IOException;
-
 	/*--------------- Parse CSS Property Value-----------------*/
 
 	/**
@@ -94,22 +88,12 @@ public interface CSSEngine {
 	 */
 	CSSValue parsePropertyValue(Reader reader) throws IOException;
 
-	/**
-	 * Parse CSSValue from InputSource source.
-	 */
-	CSSValue parsePropertyValue(InputSource source) throws IOException;
-
 	/*--------------- Apply styles -----------------*/
 
 	/**
 	 * Parse Selectors from String value.
 	 */
 	Selectors.SelectorList parseSelectors(String text);
-
-	/**
-	 * Parse Selectors from InputSource value.
-	 */
-	Selectors.SelectorList parseSelectors(InputSource source) throws IOException;
 
 	/**
 	 * Parse Selectors from InputStream.
@@ -163,11 +147,6 @@ public interface CSSEngine {
 	CSSStyleDeclaration parseAndApplyStyleDeclaration(Object node, InputStream stream) throws IOException;
 
 	/**
-	 * Parse and apply style declaration from InputSource source.
-	 */
-	CSSStyleDeclaration parseAndApplyStyleDeclaration(Object node, InputSource sourcee) throws IOException;
-
-	/**
 	 * Parse and apply style declaration from String style.
 	 */
 	CSSStyleDeclaration parseAndApplyStyleDeclaration(Object node, String style) throws IOException;
@@ -204,17 +183,32 @@ public interface CSSEngine {
 	 */
 	IResourcesLocatorManager getResourcesLocatorManager();
 
-	/*--------------- Document/View CSS -----------------*/
+	/*--------------- Computed style -----------------*/
 
 	/**
-	 * Return the {@link DocumentCSS} used to store {@link CSSStyleSheet}.
+	 * Compute the merged style declaration for the given element and pseudo
+	 * element from all stylesheets registered with this engine.
 	 */
-	DocumentCSS getDocumentCSS();
+	CSSStyleDeclaration computeStyle(Element element, String pseudoElt);
 
 	/**
-	 * Return the {@link ViewCSS} used to compute {@link CSSStyleDeclaration}.
+	 * Binary-compatibility bridge for callers compiled against the removed
+	 * W3C cascade accessor; use {@link #computeStyle(Element, String)}.
 	 */
-	ViewCSS getViewCSS();
+	@Deprecated(forRemoval = true, since = "2026-06")
+	default ViewCSS getViewCSS() {
+		return new ViewCSS() {
+			@Override
+			public DocumentView getDocument() {
+				return null;
+			}
+
+			@Override
+			public CSSStyleDeclaration getComputedStyle(Element elt, String pseudoElt) {
+				return computeStyle(elt, pseudoElt);
+			}
+		};
+	}
 
 	/*--------------- w3c Element -----------------*/
 

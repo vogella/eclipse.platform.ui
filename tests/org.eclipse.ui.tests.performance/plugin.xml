@@ -69,6 +69,13 @@
             id="org.eclipse.ui.tests.performance.problemsView"
             name="Performance Problems View"/>
    </extension>
-    
- 
+   <extension
+         point="org.eclipse.ui.views">
+      <view
+            class="org.eclipse.ui.tests.performance.parts.CssStressViewPart"
+            id="org.eclipse.ui.tests.performance.cssStressView"
+            name="CSS Stress View"/>
+   </extension>
+
+
 </plugin>

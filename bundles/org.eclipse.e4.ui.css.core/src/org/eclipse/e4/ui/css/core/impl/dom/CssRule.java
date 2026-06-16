@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2008, 2013 Angelo Zerr and others.
+ * Copyright (c) 2026 Lars Vogel and others.
  *
  * This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License 2.0
@@ -9,18 +9,12 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *     Angelo Zerr <angelo.zerr@gmail.com> - initial API and implementation
+ *     Lars Vogel <Lars.Vogel@vogella.com> - initial API and implementation
  *******************************************************************************/
-package org.eclipse.e4.ui.css.core.sac;
+package org.eclipse.e4.ui.css.core.impl.dom;
 
 /**
- * Factory interface to get instance of {@link ExtendedDocumentHandler}.
+ * A rule in a parsed stylesheet: either a style rule or an {@code @import}.
  */
-public interface IDocumentHandlerFactory {
-
-	/**
-	 * Return default instance of {@link ExtendedDocumentHandler}.
-	 */
-	public ExtendedDocumentHandler makeDocumentHandler();
-
+public sealed interface CssRule permits CSSStyleRuleImpl, CSSImportRuleImpl {
 }
