@@ -17,8 +17,11 @@ package org.eclipse.e4.ui.css.swt.helpers;
 import java.net.URL;
 import org.eclipse.e4.ui.css.core.util.resources.IResourcesLocatorManager;
 import org.eclipse.e4.ui.css.core.utils.StringUtils;
+import org.eclipse.e4.ui.css.swt.CSSSWTConstants;
+import org.eclipse.jface.resource.ColorMatrix;
 import org.eclipse.jface.resource.ImageDescriptor;
 import org.eclipse.swt.graphics.Image;
+import org.eclipse.swt.graphics.RGB;
 import org.eclipse.swt.widgets.Button;
 import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.Display;
@@ -38,6 +41,11 @@ public class CSSSWTImageHelper {
 
 	public static Image getImage(CSSValue value,
 			IResourcesLocatorManager manager, Display display) throws Exception {
+		return getImage(value, manager, display, null);
+	}
+
+	public static Image getImage(CSSValue value, IResourcesLocatorManager manager, Display display, Widget widget)
+			throws Exception {
 		if (value.getCssValueType() != CSSValue.CSS_PRIMITIVE_VALUE) {
 			return null;
 		}
@@ -45,18 +53,27 @@ public class CSSSWTImageHelper {
 		switch (primitiveValue.getPrimitiveType()) {
 		case CSSPrimitiveValue.CSS_URI:
 			String path = primitiveValue.getStringValue();
-			return loadImageFromURL(path, manager);
+			return loadImageFromURL(path, manager, widget);
 		}
 		return null;
 	}
 
-	private static Image loadImageFromURL(String path,
-			IResourcesLocatorManager manager) throws Exception {
+	private static Image loadImageFromURL(String path, IResourcesLocatorManager manager, Widget widget)
+			throws Exception {
 		Image result = null;
 
 		String s = manager.resolve(path);
 		if (!StringUtils.isEmpty(s)) {
-			result = ImageDescriptor.createFromURL(new URL(s)).createImage();
+			ImageDescriptor desc = ImageDescriptor.createFromURL(new URL(s));
+			if (widget != null && s.endsWith(".svg")) { //$NON-NLS-1$
+				RGB filterColor = (RGB) widget.getData(CSSSWTConstants.CSS_SVG_FILTER_COLOR);
+				if (filterColor != null) {
+					desc = ImageDescriptor.createWithColorMatrix(desc,
+							new ColorMatrix(new float[] { 0, 0, 0, 0, filterColor.red / 255f, 0, 0, 0, 0,
+									filterColor.green / 255f, 0, 0, 0, 0, filterColor.blue / 255f, 0, 0, 0, 1, 0 }));
+				}
+			}
+			result = desc.createImage();
 		}
 
 		return result;

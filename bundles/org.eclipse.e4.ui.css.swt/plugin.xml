@@ -471,6 +471,27 @@
          </property-name>
       </handler>
       <handler
+            adapter="org.eclipse.e4.ui.css.swt.dom.ControlElement"
+            handler="org.eclipse.e4.ui.css.swt.properties.custom.CSSPropertySVGFilterSWTHandler">
+         <property-name
+               name="-eclipse-svg-filter">
+         </property-name>
+      </handler>
+      <handler
+            adapter="org.eclipse.e4.ui.css.swt.dom.ToolItemElement"
+            handler="org.eclipse.e4.ui.css.swt.properties.custom.CSSPropertySVGFilterSWTHandler">
+         <property-name
+               name="-eclipse-svg-filter">
+         </property-name>
+      </handler>
+      <handler
+            adapter="org.eclipse.e4.ui.css.swt.dom.CTabItemElement"
+            handler="org.eclipse.e4.ui.css.swt.properties.custom.CSSPropertySVGFilterSWTHandler">
+         <property-name
+               name="-eclipse-svg-filter">
+         </property-name>
+      </handler>
+      <handler
             adapter="org.eclipse.e4.ui.css.core.dom.ElementAdapter"
             handler="org.eclipse.e4.ui.css.swt.properties.custom.CSSPropertyLinesVisibleSWTHandler">
          <property-name

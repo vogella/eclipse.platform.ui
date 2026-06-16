@@ -20,6 +20,7 @@ import org.eclipse.e4.ui.css.core.engine.CSSEngine;
 import org.eclipse.e4.ui.css.swt.helpers.CSSSWTImageHelper;
 import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.widgets.Display;
+import org.eclipse.swt.widgets.Widget;
 import org.w3c.dom.css.CSSValue;
 
 public class CSSValueSWTImageConverterImpl extends AbstractCSSValueConverter {
@@ -33,9 +34,19 @@ public class CSSValueSWTImageConverterImpl extends AbstractCSSValueConverter {
 	@Override
 	public Object convert(CSSValue value, CSSEngine engine, Object context)
 			throws Exception {
-		Display display = (Display) context;
+		Display display = null;
+		Widget widget = null;
+		if (context instanceof Display) {
+			display = (Display) context;
+		} else if (context instanceof Widget) {
+			widget = (Widget) context;
+			display = widget.getDisplay();
+		}
+		if (display == null) {
+			return null;
+		}
 		return CSSSWTImageHelper.getImage(value, engine
-				.getResourcesLocatorManager(), display);
+				.getResourcesLocatorManager(), display, widget);
 	}
 
 	@Override
