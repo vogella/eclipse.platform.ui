@@ -48,6 +48,11 @@ import org.junit.jupiter.api.Test;
  * of standard views, then times repeated theme swaps between the e4 light and
  * dark themes.
  *
+ * <p>The wall-clock swap medians are noisy (paint, layout, machine load). The
+ * stable cross-run metric is the engine-internal applyStyles time, reported per
+ * swap and per call from {@link CSSCorePolicy} counters over the measured swaps
+ * only; compare that figure between commits, not the wall-clock median.</p>
+ *
  * Not part of the default test run. Invoke explicitly via
  *   mvn verify -pl :org.eclipse.ui.tests.performance -Pbuild-individual-bundles \
  *       -Dtest=CssThemeSwapPerformanceTest -DskipTests=false
@@ -83,7 +88,7 @@ public class CssThemeSwapPerformanceTest {
 			"org.eclipse.help.ui.HelpView");
 
 	private static final int EDITOR_COUNT = 20;
-	private static final int WARMUP_ROUNDS = 3;
+	private static final int WARMUP_ROUNDS = 5;
 	private static final int MEASURE_ROUNDS = 10;
 	private static final long PRE_SWAP_WAIT_MS = 5_000;
 
@@ -246,16 +251,28 @@ public class CssThemeSwapPerformanceTest {
 
 	private void runThemeSwapBenchmark(IThemeEngine themeEngine) {
 		for (int i = 0; i < WARMUP_ROUNDS; i++) {
-			swap(themeEngine, i % 2 == 0 ? DARK_THEME : LIGHT_THEME);
+			swap(themeEngine, DARK_THEME);
+			swap(themeEngine, LIGHT_THEME);
 		}
-		long[] samples = new long[MEASURE_ROUNDS];
+		// Measure the two directions separately: a dark and a light swap style
+		// different property sets, so folding them into one median is bimodal.
+		// Settle on a clean heap and reset the engine counters after warmup so
+		// the stable applyStyles metric covers only the measured swaps.
+		System.gc();
+		CSSCorePolicy.reset();
+		long[] toDark = new long[MEASURE_ROUNDS];
+		long[] toLight = new long[MEASURE_ROUNDS];
 		for (int i = 0; i < MEASURE_ROUNDS; i++) {
-			String target = i % 2 == 0 ? DARK_THEME : LIGHT_THEME;
 			long t0 = System.nanoTime();
-			swap(themeEngine, target);
-			samples[i] = System.nanoTime() - t0;
+			swap(themeEngine, DARK_THEME);
+			toDark[i] = System.nanoTime() - t0;
+			t0 = System.nanoTime();
+			swap(themeEngine, LIGHT_THEME);
+			toLight[i] = System.nanoTime() - t0;
 		}
-		report("theme swap dark<->light (real workbench)", samples);
+		report("theme swap -> dark ", toDark);
+		report("theme swap -> light", toLight);
+		reportEngine(2L * MEASURE_ROUNDS);
 	}
 
 	private void runApplyStylesBenchmark(IThemeEngine themeEngine, IWorkbenchWindow window) {
@@ -264,6 +281,8 @@ public class CssThemeSwapPerformanceTest {
 			themeEngine.applyStyles(window.getShell(), true);
 			processEvents();
 		}
+		System.gc();
+		CSSCorePolicy.reset();
 		long[] samples = new long[MEASURE_ROUNDS];
 		for (int i = 0; i < MEASURE_ROUNDS; i++) {
 			long t0 = System.nanoTime();
@@ -272,6 +291,7 @@ public class CssThemeSwapPerformanceTest {
 			samples[i] = System.nanoTime() - t0;
 		}
 		report("applyStyles full workbench shell", samples);
+		reportEngine(MEASURE_ROUNDS);
 	}
 
 	private void swap(IThemeEngine engine, String themeId) {
@@ -309,5 +329,20 @@ public class CssThemeSwapPerformanceTest {
 				"[CSS-PERF] %s rounds=%d min=%.2fms median=%.2fms p95=%.2fms max=%.2fms mean=%.2fms%n",
 				label, ns.length,
 				min / 1e6, median / 1e6, p95 / 1e6, max / 1e6, meanMs);
+	}
+
+	/**
+	 * Reports the engine-internal applyStyles cost, the stable cross-run metric:
+	 * instrumented applyStyles time per measured swap and per call. Far less
+	 * noisy than the wall-clock swap medians, which include paint and layout.
+	 */
+	private void reportEngine(long swaps) {
+		long calls = CSSCorePolicy.applyStylesCount.get();
+		long ns = CSSCorePolicy.applyStylesNs.get();
+		double perSwapMs = ns / 1_000_000.0 / swaps;
+		double perCallUs = calls == 0 ? 0 : ns / 1000.0 / calls;
+		System.out.printf(
+				"[CSS-PERF] engine applyStyles: swaps=%d per-swap=%.2fms per-call=%.2fus calls/swap=%d%n",
+				swaps, perSwapMs, perCallUs, swaps == 0 ? 0 : calls / swaps);
 	}
 }
