@@ -21,6 +21,8 @@ import java.util.List;
 import org.eclipse.core.resources.IContainer;
 import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.IPath;
+import org.eclipse.e4.ui.dialogs.filteredtree.FilteredTree;
+import org.eclipse.e4.ui.dialogs.filteredtree.PatternFilter;
 import org.eclipse.equinox.bidi.StructuredTextTypeHandlerFactory;
 import org.eclipse.jface.dialogs.Dialog;
 import org.eclipse.jface.util.BidiUtils;
@@ -40,7 +42,6 @@ import org.eclipse.swt.widgets.Listener;
 import org.eclipse.swt.widgets.Text;
 import org.eclipse.ui.internal.ide.IDEWorkbenchMessages;
 import org.eclipse.ui.model.WorkbenchLabelProvider;
-import org.eclipse.ui.part.DrillDownComposite;
 
 /**
  * Workbench-level composite for choosing a container.
@@ -244,16 +245,14 @@ public class ContainerSelectionGroup extends Composite {
 	 *            height hint for the drill down composite
 	 */
 	protected void createTreeViewer(int heightHint) {
-		// Create drill down.
-		DrillDownComposite drillDown = new DrillDownComposite(this, SWT.BORDER);
+		// Create a filtered tree so the user can search for a container.
+		FilteredTree filteredTree = new FilteredTree(this, SWT.SINGLE | SWT.BORDER, new PatternFilter());
 		GridData spec = new GridData(SWT.FILL, SWT.FILL, true, true);
 		spec.widthHint = SIZING_SELECTION_PANE_WIDTH;
 		spec.heightHint = heightHint;
-		drillDown.setLayoutData(spec);
+		filteredTree.setLayoutData(spec);
 
-		// Create tree viewer inside drill down.
-		treeViewer = new TreeViewer(drillDown, SWT.NONE);
-		drillDown.setChildTree(treeViewer);
+		treeViewer = filteredTree.getViewer();
 		ContainerContentProvider cp = new ContainerContentProvider();
 		cp.showClosedProjects(showClosedProjects);
 		treeViewer.setContentProvider(cp);
