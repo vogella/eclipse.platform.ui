@@ -14,12 +14,14 @@ CSS is internal API (every export is `x-internal` / `x-friends`), so internal si
 | 1 | Test safety net | ~+1,000 | merged (#3970, #3974, #3979, #3983) |
 | 2 | Flatten engine / helper hierarchies | ~−2,000 | merged (#4040, #4042, #4048, #4049) |
 | 3 | Drop SAC, replace Batik with internal parser | ~−3,900 | **PR #4092 open** |
-| 4 | Replace W3C DOM mirror with records | ~−3,500 | done on `css-engine-rework`, not yet PR'd |
+| 4a | Delete DOM mirror + CSS2Properties facade orphaned by #4092 | ~−1,750 | **draft PR #4112** (stacked on #4092) |
+| 4b | Value-record model: `CssValues`, consumer migration, cascade | ~−1,200 | done on `css-engine-rework`, not yet PR'd |
 | 5 | Collapse trivial property-handler classes | ~−1,700 | not started |
 | 6 | Merge `css.swt.theme` into `css.swt` | ~−200 | not started |
 
-Un-shipped work lives on branch `css-engine-rework`; phases ship as individual PRs cherry-picked off it, gated by the Phase 1 test suite.
-**Next: open the Phase 4 PR** (the DOM-mirror-to-records swap, which removes the final SAC type, `LexicalUnit`), then Phase 5, then Phase 6.
+Un-shipped work lives on branch `css-engine-rework`; phases ship as individual PRs cherry-picked off it, one commit per PR, gated by the Phase 1 test suite.
+Phase 4 is split in two: the deletions (4a) are open as draft #4112 stacked on #4092, the value-record model (4b, which removes the final SAC type `LexicalUnit`) follows once #4092 and 4a land.
+**Next: merge #4092, un-draft #4112, then open Phase 4b**, then Phase 5, then Phase 6.
 
 ## Background
 
