@@ -94,6 +94,12 @@ Benchmark (`CssThemeSwapPerformanceTest`, ~4,000 SWT widgets + 20 Java editors):
 
 The parser cutover itself makes parsing ~22% faster in isolation (≈14 ms vs 18 ms per full theme parse), but parsing is under 1% of a swap, so it does not move the end-to-end number; the defensible claim is that the cutover did not regress swap time and sped up parsing.
 
+Phase 4b (value records) was measured the same way, before (4a tip) and after.
+The engine-internal `applyStyles` cost fell from about 270 µs to about 211 µs per call (~20% cheaper), with no theme-swap regression.
+A `-Xlog:gc` run on each confirmed no memory leak: zero Full GCs, sub-second total stop-the-world GC over a ~6-minute run, and live heap under 100 MB, identical before and after.
+The wall-clock swap median swings ±1.5 s run to run on this bench and cannot gate the comparison, so the benchmark was reworked to report the engine `applyStyles` time per swap and per call as the stable metric (counters reset after warmup so they cover only measured swaps) and to time dark and light swaps separately since they are bimodal.
+`@RepeatedTest` was tried and rejected: re-running the heavy workbench setup per repetition folds run-to-run variance into the result rather than averaging it out.
+
 ## Risks
 
 - **Theme regressions.** The shipped themes are the real acceptance test. Keep the differential-parse check (every `.css` under `bundles/**/css/`, compare selector text + declaration counts) available when changing the parser or value model.
