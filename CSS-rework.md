@@ -6,22 +6,25 @@ Goal: trim the e4 CSS stack (`org.eclipse.e4.ui.css.core`, `org.eclipse.e4.ui.cs
 The removed bulk is dead-API plumbing, the SAC/Batik parser wrapping, a redundant W3C DOM mirror, and one-class-per-property handler files.
 CSS is internal API (every export is `x-internal` / `x-friends`), so internal signatures change freely; the public `IStylingEngine` / `IThemeEngine` contract is frozen.
 
-## Status (2026-06-17)
+## Status (2026-06-19)
 
-| Phase | Work | LOC delta | State |
-|---|---|---|---|
-| 0 | Mechanical cleanups | ~−500 | merged (#3975–#3978) |
-| 1 | Test safety net | ~+1,000 | merged (#3970, #3974, #3979, #3983) |
-| 2 | Flatten engine / helper hierarchies | ~−2,000 | merged (#4040, #4042, #4048, #4049) |
-| 3 | Drop SAC, replace Batik with internal parser | ~−3,900 | **PR #4092 open** |
-| 4a | Delete DOM mirror + CSS2Properties facade orphaned by #4092 | ~−1,750 | **draft PR #4112** (stacked on #4092) |
-| 4b | Value-record model: `CssValues`, consumer migration, cascade | ~−1,200 | done on `css-engine-rework`, not yet PR'd |
-| 5 | Collapse trivial property-handler classes | ~−1,700 | not started |
-| 6 | Merge `css.swt.theme` into `css.swt` | ~−200 | not started |
+| Phase | Work | State |
+|---|---|---|
+| 0 | Mechanical cleanups | merged (#3975–#3978) |
+| 1 | Test safety net | merged (#3970, #3974, #3979, #3983) |
+| 2 | Flatten engine / helper hierarchies | merged (#4040, #4042, #4048, #4049) |
+| 3 | Drop SAC, replace Batik with internal parser | merged (#4092) |
+| 4a | Delete DOM mirror + CSS2Properties facade | merged (#4112, #4115) |
+| 4b | Value-record model, as four one-commit PRs: | in progress |
+| | · replace SAC value model with `CssValues` records | merged (#4117) |
+| | · migrate ~96 value consumers to the records | in review (#4120) |
+| | · replace W3C computed-style cascade | staged on `css-cascade-internal-types`, push next |
+| | · retire `CSSValueImpl`, pin the W3C bridge | still to write |
+| 5 | Collapse trivial property-handler classes | not started |
+| 6 | Merge `css.swt.theme` into `css.swt` | not started |
 
-Un-shipped work lives on branch `css-engine-rework`; phases ship as individual PRs cherry-picked off it, one commit per PR, gated by the Phase 1 test suite.
-Phase 4 is split in two: the deletions (4a) are open as draft #4112 stacked on #4092, the value-record model (4b, which removes the final SAC type `LexicalUnit`) follows once #4092 and 4a land.
-**Next: merge #4092, un-draft #4112, then open Phase 4b**, then Phase 5, then Phase 6.
+Phases 0–4a are merged. Phase 4b removes the final SAC type (`LexicalUnit`) and is landing as four separate one-commit PRs off `master`; each phase now merges on its own rather than through the earlier `css-engine-rework` integration stack. The value-record model is in (#4117), the consumer migration is in review (#4120), the cascade commit is staged on `css-cascade-internal-types`, and the `CSSValueImpl` retirement is still to write.
+**Next: land #4120, push and open the cascade PR, then the `CSSValueImpl` retirement PR**, then Phase 5, then Phase 6.
 
 ## Background
 
@@ -38,15 +41,15 @@ That is blocked by frozen public API: `IStylingEngine.getStyle` / `IThemeEngine.
 So the value records and `CSSStyleDeclarationImpl` keep implementing the W3C interfaces as a thin, documented compatibility facade; everything inside the engine reads the records directly.
 Dropping the facade would require an API-breaking revision of `IStylingEngine` / `IThemeEngine`, out of scope here.
 
-## Completed phases (0–4)
+## Phases 0–4 in detail
 
-Compressed; the code is the source of truth. Decisions that still constrain later work are called out.
+Compressed; the code is the source of truth. Decisions that still constrain later work are called out. Per-PR landing state for 4a/4b is in the Status table above.
 
 - **Phase 0 — mechanical cleanups.** Removed `BootstrapTheme3x`, the unreachable `IOException` on `CSSEngine` String overloads, dead `SACConstants` entries, and unused serializer / color-converter config.
 - **Phase 1 — test safety net.** Added `CSSEngineTest` (selector matching), `StyleSheetStructureTest` (parser round-trip), `PaddingTest`, and three selector integration tests (tab selection, `.active`, preference pseudo). The property-handler gap-fill was deliberately scoped down: only padding got a dedicated test; border geometry, lines-visible, the six CTabFolder visual-rendering handlers, and theme-element-definition were judged low-value to lock in given the rework redesigns their surface anyway. All new tests use only `CSSEngine` / `CSSStyleSheet` / `CSSRule` / `CSSStyleDeclaration` / `TestElement`, no SAC types, so they survive the parser swap.
 - **Phase 2 — flatten hierarchies.** Merged `AbstractCSSEngine` into `CSSEngineImpl` and `AbstractCSSSWTEngineImpl` into `CSSSWTEngineImpl`; folded `ICSSPropertyHandler2` / `ICSSPropertyHandler2Delegate` into `ICSSPropertyHandler` via Java 21 default methods; deleted the unused `PropertyHelper`; replaced the vendored 3,205-line `URI` copy with a Require-Bundle on `org.eclipse.emf.common`.
 - **Phase 3 — drop SAC, replace Batik (PR #4092).** An internal `Selector` AST (sealed interface + records) plus a `SelectorMatcher` replace the SAC selector layer and the 26 vendored `impl/sac/*` wrappers; a hand-written tokenizer + recursive-descent parser in `impl/parser/` replaces Batik and drops the `org.apache.batik.css` Require-Bundle. `@media` / `@font-face` / `@page` are parsed and discarded. The only remaining SAC type is the `LexicalUnit` interface in the value model, which Phase 4 removes. Validated by a byte-for-byte differential comparison against Batik over all shipped themes plus the full css.core / css.swt suites. See [Performance](#performance).
-- **Phase 4 — replace the W3C DOM mirror with records.** `impl/dom/*` (~32 classes) and the cascade classes (`ViewCSSImpl`, `DocumentCSSImpl`, `CSSValueImpl`, ...) give way to `CssValues`, a sealed record hierarchy the parser builds directly, plus a plain rule list (`CSSStyleSheetImpl` over a sealed `CssRule`). The ~96 property handlers, converters, and SWT helpers pattern-match on the records (`CssUnit` enum, `CssNumeric` interface, `CssText.Kind`) instead of reading W3C type shorts. `CSSEngine.computeStyle(Element, pseudo)` replaces `getViewCSS().getComputedStyle(...)`. The W3C facade is retained (see Background). Zero SAC dependency remains.
+- **Phase 4 — replace the W3C DOM mirror with records.** `impl/dom/*` (~32 classes) and the cascade classes (`ViewCSSImpl`, `DocumentCSSImpl`, `CSSValueImpl`, ...) give way to `CssValues`, a sealed record hierarchy the parser builds directly, plus a plain rule list (`CSSStyleSheetImpl` over a sealed `CssRule`). The ~96 property handlers, converters, and SWT helpers pattern-match on the records (`CssUnit` enum, `CssNumeric` interface, `CssText.Kind`) instead of reading W3C type shorts. `CSSEngine.computeStyle(Element, pseudo)` replaces `getViewCSS().getComputedStyle(...)`. The W3C facade is retained (see Background). Zero SAC dependency remains. This lands as the 4a deletions (merged) plus four one-commit 4b PRs; see the Status table for per-PR state.
 
 ## Remaining work
 
