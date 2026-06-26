@@ -6,7 +6,7 @@ Goal: trim the e4 CSS stack (`org.eclipse.e4.ui.css.core`, `org.eclipse.e4.ui.cs
 The removed bulk is dead-API plumbing, the SAC/Batik parser wrapping, a redundant W3C DOM mirror, and one-class-per-property handler files.
 CSS is internal API (every export is `x-internal` / `x-friends`), so internal signatures change freely; the public `IStylingEngine` / `IThemeEngine` contract is frozen.
 
-## Status (2026-06-19)
+## Status (2026-06-26)
 
 | Phase | Work | State |
 |---|---|---|
@@ -17,14 +17,14 @@ CSS is internal API (every export is `x-internal` / `x-friends`), so internal si
 | 4a | Delete DOM mirror + CSS2Properties facade | merged (#4112, #4115) |
 | 4b | Value-record model, as four one-commit PRs: | in progress |
 | | · replace SAC value model with `CssValues` records | merged (#4117) |
-| | · migrate ~96 value consumers to the records | in review (#4120) |
-| | · replace W3C computed-style cascade | staged on `css-cascade-internal-types`, push next |
+| | · migrate ~96 value consumers to the records | merged (#4120) |
+| | · replace W3C computed-style cascade | staged on `css-cascade-internal-types`, PR next |
 | | · retire `CSSValueImpl`, pin the W3C bridge | still to write |
 | 5 | Collapse trivial property-handler classes | not started |
 | 6 | Merge `css.swt.theme` into `css.swt` | not started |
 
-Phases 0–4a are merged. Phase 4b removes the final SAC type (`LexicalUnit`) and is landing as four separate one-commit PRs off `master`; each phase now merges on its own rather than through the earlier `css-engine-rework` integration stack. The value-record model is in (#4117), the consumer migration is in review (#4120), the cascade commit is staged on `css-cascade-internal-types`, and the `CSSValueImpl` retirement is still to write.
-**Next: land #4120, push and open the cascade PR, then the `CSSValueImpl` retirement PR**, then Phase 5, then Phase 6.
+Phases 0–4a are merged. Phase 4b removes the final SAC type (`LexicalUnit`) and is landing as four separate one-commit PRs off `master`; each phase now merges on its own rather than through the earlier `css-engine-rework` integration stack. The value-record model is in (#4117), the consumer migration is in (#4120), the cascade commit is staged on `css-cascade-internal-types`, and the `CSSValueImpl` retirement is still to write.
+**Next: push and open the cascade PR, then the `CSSValueImpl` retirement PR**, then Phase 5, then Phase 6.
 
 ## Background
 
