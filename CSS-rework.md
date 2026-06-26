@@ -20,6 +20,7 @@ CSS is internal API (every export is `x-internal` / `x-friends`), so internal si
 | | · migrate ~96 value consumers to the records | merged (#4120) |
 | | · replace W3C computed-style cascade | staged on `css-cascade-internal-types`, PR next |
 | | · retire `CSSValueImpl`, pin the W3C bridge | still to write |
+| 4c | Drop the stale `org.w3c.css.sac` test dependency | draft PR |
 | 5 | Collapse trivial property-handler classes | not started |
 | 6 | Merge `css.swt.theme` into `css.swt` | not started |
 
@@ -52,6 +53,14 @@ Compressed; the code is the source of truth. Decisions that still constrain late
 - **Phase 4 — replace the W3C DOM mirror with records.** `impl/dom/*` (~32 classes) and the cascade classes (`ViewCSSImpl`, `DocumentCSSImpl`, `CSSValueImpl`, ...) give way to `CssValues`, a sealed record hierarchy the parser builds directly, plus a plain rule list (`CSSStyleSheetImpl` over a sealed `CssRule`). The ~96 property handlers, converters, and SWT helpers pattern-match on the records (`CssUnit` enum, `CssNumeric` interface, `CssText.Kind`) instead of reading W3C type shorts. `CSSEngine.computeStyle(Element, pseudo)` replaces `getViewCSS().getComputedStyle(...)`. The W3C facade is retained (see Background). Zero SAC dependency remains. This lands as the 4a deletions (merged) plus four one-commit 4b PRs; see the Status table for per-PR state.
 
 ## Remaining work
+
+### Phase 4c — drop the stale SAC test dependency
+
+The production bundles carry no SAC reference after Phase 4b; the only `org.w3c.css.sac` trace left in the repo is in the `org.eclipse.e4.ui.tests.css.swt` test bundle.
+Its `tkuiTestsToRefactor/` folder (legacy tkui tests, ~43 files) still imports `org.w3c.css.sac`, and the bundle MANIFEST keeps an `Import-Package: org.w3c.css.sac`.
+That folder is not on the build path (`build.properties` compiles only `src/`), so it is dead weight, not running tests.
+Delete `tkuiTestsToRefactor/` and remove the SAC `Import-Package`; afterwards nothing in this repo references SAC or Batik, so the `org.w3c.css.sac` bundle can leave the target platform (provided no bundle outside `eclipse.platform.ui` still needs it).
+Independent of the cascade PR (#4122); lands directly off `master`.
 
 ### Phase 5 — collapse trivial property-handler classes
 
