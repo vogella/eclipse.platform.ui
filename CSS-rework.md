@@ -27,7 +27,7 @@ CSS is internal API (every export is `x-internal` / `x-friends`), so internal si
 
 Phases 0–4a and 4c are merged. Phase 4b removes the final SAC type (`LexicalUnit`) and is landing as four separate one-commit PRs off `master`; the value-record model (#4117) and the consumer migration (#4120) are in.
 The cascade PR #4122 is open, rebased, and green; its only blocker is the PDE CSS spy, which calls `CSSEngine.getDocumentCSS()` / `ExtendedDocumentCSS` (deleted by #4122) in two places, while its `getViewCSS().getComputedStyle` call sites keep working through the deprecated bridge the PR retains.
-The PDE-side SAC fixes are merged (eclipse.pde #2385, #2393); a version-agnostic spy rework (same approach as eclipse.pde #2352) has been tasked in the eclipse.pde repo and removes the remaining coupling, so #4122 no longer needs a coordinated early-M2 merge.
+The PDE-side SAC fixes are merged (eclipse.pde #2385, #2393); the version-agnostic spy rework (same approach as eclipse.pde #2352) is implemented and reviewed on the eclipse.pde branch `css-spy-documentcss-agnostic` (reflective `CssEngineCompat` helper), pending PR, and removes the remaining coupling, so #4122 no longer needs a coordinated early-M2 merge.
 **Next: land the PDE spy decoupling PR, merge #4122, then open the `CSSValueImpl` retirement PR (write it now, stacked on `css-cascade-internal-types`)**; Phase 5 is independent and can start in parallel.
 
 ## Background
@@ -62,10 +62,13 @@ Compressed; the code is the source of truth. Decisions that still constrain late
 
 #4122 is technically ready: one commit, rebased on `master`, all checks green, net −729 LOC.
 Its only external coupling is the PDE CSS spy: `CssSpyPart.getCSSRuleSources` and `CSSScratchPadPart` call `CSSEngine.getDocumentCSS()` / cast to `ExtendedDocumentCSS`, both deleted by the PR; the spy's four `getViewCSS().getComputedStyle` call sites survive through the deprecated `getViewCSS()` default bridge #4122 keeps.
-Instead of a coordinated early-M2 merge, a version-agnostic spy PR lands on the PDE side first (reflective compat helper, same pattern as eclipse.pde #2352); the task for it is written and handed to the eclipse.pde repo.
+Instead of a coordinated early-M2 merge, a version-agnostic spy PR lands on the PDE side first (reflective `CssEngineCompat` helper, same pattern as eclipse.pde #2352); it is implemented and reviewed on the eclipse.pde branch `css-spy-documentcss-agnostic`.
 Once that is merged, #4122 merges independently, at any time.
 Then the last 4b PR retires `CSSValueImpl` and pins the W3C facade; write it now, stacked on `css-cascade-internal-types`, so it is ready the moment #4122 goes in.
-Remove the deprecated `getViewCSS()` bridge one release after the PDE spy stops calling it.
+
+The spy's reflection is a temporary compat layer with a defined retirement.
+Once the PDE target platform contains the platform.ui build with #4122, a PDE cleanup PR deletes `CssEngineCompat` and calls the new engine API directly (`getStyleSheets()` / `getRules()` for the rule sources, plain `parseStyleSheet` for the scratch pad), migrates the spy's four `getViewCSS().getComputedStyle` call sites to `computeStyle`, and bumps the spy's `Require-Bundle` lower bound on `org.eclipse.e4.ui.css.core` to the version #4122 ships in, so p2 refuses to install the new spy into an old platform.
+Remove the deprecated `getViewCSS()` bridge here one release after that cleanup lands, since the spy is its last known caller.
 
 ### Phase 5 — collapse trivial property-handler classes
 
