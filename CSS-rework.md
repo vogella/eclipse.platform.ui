@@ -66,6 +66,7 @@ Instead of a coordinated early-M2 merge, a version-agnostic spy PR lands on the 
 Once that is merged, #4122 merges independently, at any time.
 The last 4b PR retires `CSSValueImpl` and pins the W3C facade; it is written and tested on `css-retire-cssvalueimpl`, stacked on `css-cascade-internal-types`, ready to open the moment #4122 goes in.
 The cascade commit already left `CSSValueImpl` unreferenced, so the commit deletes it and pins the remaining facade (`CssValues` records, `CSSStyleDeclarationImpl`) in documentation as permanent rather than transitional; the existing `ValueTest` / `CssParserTest` / `StyleRuleTest` coverage already locks the facade behavior, so no new test was added.
+A second commit on the branch drops the now-dead DOM exception message-key machinery (`DOMExceptionImpl`, `ExceptionResource`): only two of its 19 messages were still referenced, now inlined as plain `DOMException` throws at the four call sites.
 
 The spy's reflection is a temporary compat layer with a defined retirement.
 Once the PDE target platform contains the platform.ui build with #4122, a PDE cleanup PR deletes `CssEngineCompat` and calls the new engine API directly (`getStyleSheets()` / `getRules()` for the rule sources, plain `parseStyleSheet` for the scratch pad), migrates the spy's four `getViewCSS().getComputedStyle` call sites to `computeStyle`, and bumps the spy's `Require-Bundle` lower bound on `org.eclipse.e4.ui.css.core` to the version #4122 ships in, so p2 refuses to install the new spy into an old platform.
