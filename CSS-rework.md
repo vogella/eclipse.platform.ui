@@ -65,8 +65,9 @@ The last 4b PR retires `CSSValueImpl` and pins the W3C facade; it is open as #41
 The cascade commit already left `CSSValueImpl` unreferenced, so the commit deletes it and pins the remaining facade (`CssValues` records, `CSSStyleDeclarationImpl`) in documentation as permanent rather than transitional; the existing `ValueTest` / `CssParserTest` / `StyleRuleTest` coverage already locks the facade behavior, so no new test was added.
 A second commit on the branch drops the now-dead DOM exception message-key machinery (`DOMExceptionImpl`, `ExceptionResource`): only two of its 19 messages were still referenced, now inlined as plain `DOMException` throws at the four call sites.
 
-The spy's reflection is a temporary compat layer with a defined retirement.
-Once the PDE target platform contains the platform.ui build with #4122, a PDE cleanup PR deletes `CssEngineCompat` and calls the new engine API directly (`getStyleSheets()` / `getRules()` for the rule sources, plain `parseStyleSheet` for the scratch pad), migrates the spy's four `getViewCSS().getComputedStyle` call sites to `computeStyle`, and bumps the spy's `Require-Bundle` lower bound on `org.eclipse.e4.ui.css.core` to the version #4122 ships in, so p2 refuses to install the new spy into an old platform.
+The spy's reflection is a temporary compat layer with a defined retirement, and the cleanup PR is open as eclipse.pde #2399 (branch `spy-css-drop-cascade-reflection`): it deletes `CssEngineCompat`, calls the new engine API directly (`getStyleSheets()` / `getRules()` for the rule sources, plain `parseStyleSheet` for the scratch pad), and migrates the spy's `getViewCSS().getComputedStyle` call sites to `computeStyle`.
+It cannot compile until the PDE target platform contains a platform build with #4122, so its CI stays red by design; merge once the target updates.
+Still missing from #2399: the spy's `Require-Bundle` lower bound on `org.eclipse.e4.ui.css.core` is 0.9.0 and should be raised to 0.14.800 (the version the new API ships in) so p2 refuses to install the new spy into an old platform.
 Remove the deprecated `getViewCSS()` bridge here one release after that cleanup lands, since the spy is its last known caller.
 
 ### Phase 5 — collapse trivial property-handler classes
