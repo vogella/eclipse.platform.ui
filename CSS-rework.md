@@ -24,6 +24,7 @@ CSS is internal API (every export is `x-internal` / `x-friends`), so internal si
 | 5 | Collapse trivial property-handler classes | PR #4161 open; completes the phase |
 | 6 | Merge `css.swt.theme` into `css.swt` | not started |
 | 7 | Index rules by rightmost simple selector | draft PR #4163 open (−21% engine time) |
+| 8 | Delete dead reflection dispatch, table-ize SWT style helper, lazy style attribute | not started (~−1,300 LOC) |
 
 Phases 0–4a and 4c are merged. Phase 4b removes the final SAC type (`LexicalUnit`) and lands as four separate one-commit PRs off `master`; the value-record model (#4117), the consumer migration (#4120), and the cascade replacement (#4122, merged 2026-07-04) are in.
 The PDE CSS spy coupling is resolved: the version-agnostic spy rework merged as eclipse.pde #2396 (reflective `CssEngineCompat` helper, same pattern as #2352), following the earlier SAC fixes #2385 and #2393, so #4122 merged without coordination.
@@ -115,6 +116,41 @@ Measured with `CssThemeSwapPerformanceTest` (now ported into the repo on branch 
 Note the headless-bench caveat: both runs on the same machine, same reactor, 10 measured rounds per direction.
 The rule-indexing change is open as draft PR #4163, citing the measurement; the bench PR (branch `css-theme-swap-bench`) is not yet opened.
 A per-styling-session memo of computed styles keyed on the element's style-relevant state would be the next escalation, but it is more invasive (ancestry matters for descendant combinators), so only reach for it if indexing is not enough.
+
+### Phase 8 — remove the dead reflection dispatch and table-ize the SWT style helper
+
+Three internal cleanups surfaced after the phase plan was drawn up; none changes styling behaviour.
+8a and 8b are pure code removal, independent of the open PRs, and can start off `master` at any time, one PR each; 8c is a small optimization sequenced after #4163.
+
+Effort: 2 to 3 days total. Low risk: 8a deletes verified-dead code, 8b is a mechanical rewrite with the behavior notes below, 8c changes only when a string is computed.
+
+**8a — delete the unreachable reflection-based property-handler dispatch (~630 LOC).**
+Production registers exactly one handler provider: `CSSSWTEngineImpl` adds `RegistryCSSPropertyHandlerProvider` (extension-point driven) and nothing else (verified, `CSSSWTEngineImpl` line 73 is the only `propertyHandlerProviders.add` in production).
+The other two providers are dead: `CSSPropertyHandlerLazyProviderImpl` (203 LOC) resolves handlers by reflecting over a naming convention (`border-top-color` to `CSSPropertyBorderTopColorHandler`, via `classLoader.loadClass` + `newInstance`), and `CSSPropertyHandlerSimpleProviderImpl` (288 LOC) alongside it.
+Both are only instantiated inside `CSSEngineImpl`, gated behind `registerPackage` / `registerCSSProperty` / `registerCSSPropertyHandler`, and nothing in `bundles/`, `tests/`, or `examples/` calls those three methods except the single test `CSSPropertyHandlerProviderTest` (verified by grep; `InheritTest` is a near-miss that actually calls the different, surviving `registerCSSPropertyHandlerProvider`).
+So delete both providers plus `UnsupportedClassCSSPropertyException` (39 LOC, only the lazy provider references it; 530 LOC across the three files), the `handlerProvider` / `lazyHandlerProvider` fields and their `initHandlerProviderIfNeed` / `initLazyHandlerProviderIfNeed` / `registerPackage` / `registerCSSProperty` / `registerCSSPropertyHandler` methods on `CSSEngineImpl`, and the test.
+Watch the method-name prefix collision when cutting: `registerCSSPropertyHandlerProvider` (provider-level registration, used by `CSSSWTEngineImpl` and `InheritTest`) stays; only the three handler-level methods go.
+`AbstractCSSPropertyHandlerProvider` stays, since `RegistryCSSPropertyHandlerProvider` extends it.
+This removes the last naming-convention reflection from the engine and pairs with Phase 5, which collapses the very handler classes the dead path would have resolved.
+These are `impl` / `x-internal` types, so per the internal-signature rule they change freely; confirm no out-of-repo x-friend calls `registerPackage` and friends before cutting.
+
+**8b — replace the 774-line SWT-style-to-string helper with a lookup table.**
+`SWTStyleHelpers.getSWTWidgetStyleAsString` is 118 near-identical blocks of `try { if ((style & SWT.X) != 0) add("SWT.X"); } catch (Exception e) {}`, one per SWT constant (verified: 118 `addSWTStyle` call sites).
+The per-constant catch guards against an SWT build missing a constant, but `css.swt` Require-Bundles a fixed SWT range, so every referenced constant is compile-time guaranteed.
+Replace the body with a static `{int mask, String name}` table iterated once: about 700 LOC down to 40, and 118 exception-swallowing blocks gone.
+Three behaviors to preserve exactly: both public overloads including `getSWTWidgetStyleAsString(int style, String separator)` with its separator parameter and the empty-string returns for `style == 0` and disposed widgets; every name for a shared bit value must still be emitted (SWT reuses bits, e.g. `SWT.DOWN` and `SWT.BOTTOM` are the same constant, and the dark theme's `CTabFolder[style~='SWT.DOWN'][style~='SWT.BOTTOM']` relies on both words appearing); keep the current emission order by keeping table rows in the existing block order (word matching with `~=` is order-independent, but the string is engine-visible via `getAttribute("style")`, so do not change it gratuitously).
+Covered by the existing selector integration tests (`[style~='SWT.PUSH']` and the other `[style~=...]` cases), whose green state is the acceptance check; no test asserts a full non-empty style string.
+
+**8c — make the SWT style attribute lazy (sequence after Phase 7).**
+`WidgetElement` computes the full style string eagerly in its constructor (`this.swtStyles = computeAttributeSWTStyle()`), so all ~4,000 widgets in a swap pay the constant scan even though shipped themes query `[style~=...]` on few widget types.
+Verified against the shipped themes: every active `[style~=...]` rule has a tag in its rightmost compound (`Button`, `Text`, `StyledText`, `CTabFolder`); the two apparent exceptions are harmless, `SWT.NO_BACKGROUND` only occurs inside a CSS comment and `Shell [style~='SWT.DROP_DOWN'] > StyledText` buckets under `StyledText`, with the attribute read only on StyledText ancestors during matching.
+Phase 7 buckets those selectors by their rightmost type, so once indexing lands, deferring the compute to the first `getAttribute("style")` means non-matching widget classes never build the string at all.
+Preserve `hasAttribute("style")` semantics when deferring: it must keep answering as it does today without forcing the compute, or force it, but not change its result.
+It only pays off on top of the rule index, so land it after #4163 merges.
+A custom theme with a bare `[style~=...]` selector would land in the remainder bucket and force the compute on every widget again; that degrades gracefully back to today's cost, so it is not a correctness concern.
+
+Effort: 8a about half a day (pure deletion), 8b an hour, 8c small. Net around −1,200 LOC.
+Low risk: 8a and 8b are behaviour-preserving deletions, 8c is gated behind Phase 7 and changes only when the string is built, not its value.
 
 ## Performance
 
