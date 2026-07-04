@@ -21,7 +21,7 @@ CSS is internal API (every export is `x-internal` / `x-friends`), so internal si
 | | · replace W3C computed-style cascade | merged (#4122) |
 | | · retire `CSSValueImpl`, pin the W3C bridge | PR #4160 open |
 | 4c | Drop the stale `org.w3c.css.sac` test dependency | merged (#4139, #4143) |
-| 5 | Collapse trivial property-handler classes | PR #4161 open (17 CTabFolder wrappers → 2 generic handlers) |
+| 5 | Collapse trivial property-handler classes | PR #4161 open; completes the phase |
 | 6 | Merge `css.swt.theme` into `css.swt` | not started |
 | 7 | Index rules by rightmost simple selector | draft PR #4163 open (−21% engine time) |
 
@@ -90,7 +90,7 @@ First PR #4161 (branch `css-generic-property-handlers`) collapses the whole CTab
 `CSSPropertyCTabFolderSWTHandler` (ten boolean and two int folder setters) and `CSSPropertyCTabFolderRendererSWTHandler` (four color and one boolean `ICTabRendering` setter).
 Per-property value guards were carried over verbatim (e.g. `swt-tab-height` only accepts PX dimensions, `swt-tab-text-minimum-characters` only unitless numbers, renderer properties require `CssPrimitive`), and plugin.xml keeps one `property-name` entry per property on `CTabFolderElement`.
 All twelve direct folder properties are covered by `CTabFolderTest` (green); the renderer properties have no test coverage (Phase 1 scoping decision), hence the strictly shape-for-shape translation.
-Remaining Phase 5 work: sweep the `css2` package for further regular cohorts; the survey found none as clean as the CTabFolder set, so the remainder may be small or empty.
+The considered follow-up (sweeping the `css2` package for further regular cohorts) is closed without action: the survey found none as clean as the CTabFolder set, so #4161 completes the phase.
 Note for local builds: since #4122, `css.swt` no longer compiles against the 4.41 I-build target platform alone; put `css.core` in the same reactor (`-pl bundles/org.eclipse.e4.ui.css.core,bundles/org.eclipse.e4.ui.css.swt,...`) until an I-build containing #4122 is in the target.
 
 ### Phase 6 — merge `css.swt.theme` into `css.swt`
