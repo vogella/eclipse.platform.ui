@@ -19,7 +19,7 @@ CSS is internal API (every export is `x-internal` / `x-friends`), so internal si
 | | · replace SAC value model with `CssValues` records | merged (#4117) |
 | | · migrate ~96 value consumers to the records | merged (#4120) |
 | | · replace W3C computed-style cascade | merged (#4122) |
-| | · retire `CSSValueImpl`, pin the W3C bridge | next: rebase `css-retire-cssvalueimpl` onto `master`, open PR |
+| | · retire `CSSValueImpl`, pin the W3C bridge | PR #4160 open |
 | 4c | Drop the stale `org.w3c.css.sac` test dependency | merged (#4139, #4143) |
 | 5 | Collapse trivial property-handler classes | not started; can start now |
 | 6 | Merge `css.swt.theme` into `css.swt` | not started |
@@ -27,7 +27,7 @@ CSS is internal API (every export is `x-internal` / `x-friends`), so internal si
 
 Phases 0–4a and 4c are merged. Phase 4b removes the final SAC type (`LexicalUnit`) and lands as four separate one-commit PRs off `master`; the value-record model (#4117), the consumer migration (#4120), and the cascade replacement (#4122, merged 2026-07-04) are in.
 The PDE CSS spy coupling is resolved: the version-agnostic spy rework merged as eclipse.pde #2396 (reflective `CssEngineCompat` helper, same pattern as #2352), following the earlier SAC fixes #2385 and #2393, so #4122 merged without coordination.
-**Next: rebase `css-retire-cssvalueimpl` onto `master` and open the final 4b PR (retire `CSSValueImpl`, pin the W3C facade, drop the dead DOM exception machinery)**; Phase 5 is independent and can start in parallel.
+**Next: get the final 4b PR #4160 (retire `CSSValueImpl`, pin the W3C facade, drop the dead DOM exception machinery) through review and merged**; Phase 5 is independent and can start in parallel.
 
 ## Background
 
@@ -61,7 +61,7 @@ Compressed; the code is the source of truth. Decisions that still constrain late
 
 The cascade PR #4122 merged on 2026-07-04 (merge commit ef8e9f849d, net −729 LOC): `CSSEngine.computeStyle(Element, pseudo)` replaces `getViewCSS().getComputedStyle(...)`, with a deprecated `getViewCSS()` default bridge kept for the PDE spy.
 The PDE coupling was cleared first: eclipse.pde #2396 made the spy's stylesheet access cascade-agnostic (reflective `CssEngineCompat` helper, same pattern as #2352), so no coordinated merge was needed.
-The last 4b PR retires `CSSValueImpl` and pins the W3C facade; it is written and tested on `css-retire-cssvalueimpl`, currently stacked on the pre-merge cascade commit, so rebase it onto `master` before opening the PR.
+The last 4b PR retires `CSSValueImpl` and pins the W3C facade; it is open as #4160 (branch `css-retire-cssvalueimpl`, rebased onto post-#4122 `master`, two commits, both CSS bundles clean-built locally).
 The cascade commit already left `CSSValueImpl` unreferenced, so the commit deletes it and pins the remaining facade (`CssValues` records, `CSSStyleDeclarationImpl`) in documentation as permanent rather than transitional; the existing `ValueTest` / `CssParserTest` / `StyleRuleTest` coverage already locks the facade behavior, so no new test was added.
 A second commit on the branch drops the now-dead DOM exception message-key machinery (`DOMExceptionImpl`, `ExceptionResource`): only two of its 19 messages were still referenced, now inlined as plain `DOMException` throws at the four call sites.
 
