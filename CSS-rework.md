@@ -23,7 +23,7 @@ CSS is internal API (every export is `x-internal` / `x-friends`), so internal si
 | 4c | Drop the stale `org.w3c.css.sac` test dependency | merged (#4139, #4143) |
 | 5 | Collapse trivial property-handler classes | PR #4161 open (17 CTabFolder wrappers → 2 generic handlers) |
 | 6 | Merge `css.swt.theme` into `css.swt` | not started |
-| 7 | Index rules by rightmost simple selector | implemented on `css-rule-indexing`, measured −21% engine time; PR next |
+| 7 | Index rules by rightmost simple selector | draft PR #4163 open (−21% engine time) |
 
 Phases 0–4a and 4c are merged. Phase 4b removes the final SAC type (`LexicalUnit`) and lands as four separate one-commit PRs off `master`; the value-record model (#4117), the consumer migration (#4120), and the cascade replacement (#4122, merged 2026-07-04) are in.
 The PDE CSS spy coupling is resolved: the version-agnostic spy rework merged as eclipse.pde #2396 (reflective `CssEngineCompat` helper, same pattern as #2352), following the earlier SAC fixes #2385 and #2393, so #4122 merged without coordination.
@@ -113,7 +113,7 @@ Implemented on the local branch `css-rule-indexing` (commit d7e0de4c3d): a `Rule
 Both CSS suites are green (132 css.core, 210 css.swt).
 Measured with `CssThemeSwapPerformanceTest` (now ported into the repo on branch `css-theme-swap-bench`, commit 9075e17766, with a slim `CSSCorePolicy` applyStyles counter behind a `debug/perf` trace option): engine `applyStyles` fell from 196.60 µs to 155.60 µs per call and from 3345 ms to 2647 ms per swap (−21%), with identical call counts (17013 per swap, confirming unchanged styling behavior); dark-swap wall-clock median −8.6%, p95 tightened from 6.0 s to 3.4 s.
 Note the headless-bench caveat: both runs on the same machine, same reactor, 10 measured rounds per direction.
-Next: open the bench PR first, then the rule-indexing PR citing the measurement.
+The rule-indexing change is open as draft PR #4163, citing the measurement; the bench PR (branch `css-theme-swap-bench`) is not yet opened.
 A per-styling-session memo of computed styles keyed on the element's style-relevant state would be the next escalation, but it is more invasive (ancestry matters for descendant combinators), so only reach for it if indexing is not enough.
 
 ## Performance
