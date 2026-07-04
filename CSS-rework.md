@@ -23,7 +23,7 @@ CSS is internal API (every export is `x-internal` / `x-friends`), so internal si
 | 4c | Drop the stale `org.w3c.css.sac` test dependency | merged (#4139, #4143) |
 | 5 | Collapse trivial property-handler classes | PR #4161 open (17 CTabFolder wrappers → 2 generic handlers) |
 | 6 | Merge `css.swt.theme` into `css.swt` | not started |
-| 7 | Index rules by rightmost simple selector | candidate, after 4b |
+| 7 | Index rules by rightmost simple selector | implemented on `css-rule-indexing` (local); benchmark, then PR |
 
 Phases 0–4a and 4c are merged. Phase 4b removes the final SAC type (`LexicalUnit`) and lands as four separate one-commit PRs off `master`; the value-record model (#4117), the consumer migration (#4120), and the cascade replacement (#4122, merged 2026-07-04) are in.
 The PDE CSS spy coupling is resolved: the version-agnostic spy rework merged as eclipse.pde #2396 (reflective `CssEngineCompat` helper, same pattern as #2352), following the earlier SAC fixes #2385 and #2393, so #4122 merged without coordination.
@@ -108,7 +108,10 @@ The other remaining phases are mostly about "small"; this one is the main remain
 The `computeStyle` that #4122 merged still does a linear scan: every element tests every alternative of every combined rule, which is exactly the "millions of selector checks" cost flagged in the Phase 3 performance section.
 The standard fix is rule indexing by rightmost simple selector: bucket rules by id / class / tag / universal at `getCombinedRules()` time, and keep the global position counter so cascade order is preserved.
 Eclipse theme rules overwhelmingly key on widget class names, so buckets are selective, and this attacks the 211 µs per `applyStyles` call directly.
-Do it as a small post-4b phase, measured with the reworked `CssThemeSwapPerformanceTest` engine metric; with #4122 merged it is unblocked once the retirement PR is in.
+Implemented on the local branch `css-rule-indexing` (commit d7e0de4c3d): a `RuleIndex` in `impl/engine/selector` buckets every selector alternative by the id, class, or element type its rightmost compound requires, with a remainder bucket (universal, attribute-only, pseudo-only) consulted for every element; `computeStyle` feeds the bucket candidates to the matcher in cascade order, so match positions and cascade results are byte-identical to the linear scan.
+`RuleIndexTest` locks the completeness invariant (index candidates are never a subset of what the matcher would accept, verified over a stylesheet covering every selector shape) and `ViewCSSTest.testRuleCaching` was adapted to the renamed cache field.
+Both CSS suites are green (132 css.core, 210 css.swt).
+Before the PR: run the external `CssThemeSwapPerformanceTest` bench (not in this repo) to quantify the win against the ~211 µs per `applyStyles` baseline.
 A per-styling-session memo of computed styles keyed on the element's style-relevant state would be the next escalation, but it is more invasive (ancestry matters for descendant combinators), so only reach for it if indexing is not enough.
 
 ## Performance
