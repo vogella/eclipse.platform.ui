@@ -21,7 +21,7 @@ CSS is internal API (every export is `x-internal` / `x-friends`), so internal si
 | | · replace W3C computed-style cascade | merged (#4122) |
 | | · retire `CSSValueImpl`, pin the W3C bridge | PR #4160 open |
 | 4c | Drop the stale `org.w3c.css.sac` test dependency | merged (#4139, #4143) |
-| 5 | Collapse trivial property-handler classes | not started; can start now |
+| 5 | Collapse trivial property-handler classes | PR #4161 open (17 CTabFolder wrappers → 2 generic handlers) |
 | 6 | Merge `css.swt.theme` into `css.swt` | not started |
 | 7 | Index rules by rightmost simple selector | candidate, after 4b |
 
@@ -83,8 +83,14 @@ The consolidation happens inside the handler classes:
 Out of scope: removing or deprecating the `propertyHandler` / `elementProvider` extension points or `RegistryCSSPropertyHandlerProvider` itself; they stay public for downstream RCP products that contribute custom handlers, including overrides of the new generic handlers.
 
 With #4122 merged there is no overlap left to coordinate; this phase starts off `master` at any time.
-Effort: 5 to 7 days, 2 to 3 PRs. ~30 wrapper classes removed, ~3 to 5 generic handlers added.
 Medium risk: the override path is exercised by external contributors, so the generic handlers must not change observable behaviour for any single (element, property) pair.
+
+First PR #4161 (branch `css-generic-property-handlers`) collapses the whole CTabFolder cohort, 17 wrapper classes into two data-driven handlers (net −692 LOC):
+`CSSPropertyCTabFolderSWTHandler` (ten boolean and two int folder setters) and `CSSPropertyCTabFolderRendererSWTHandler` (four color and one boolean `ICTabRendering` setter).
+Per-property value guards were carried over verbatim (e.g. `swt-tab-height` only accepts PX dimensions, `swt-tab-text-minimum-characters` only unitless numbers, renderer properties require `CssPrimitive`), and plugin.xml keeps one `property-name` entry per property on `CTabFolderElement`.
+All twelve direct folder properties are covered by `CTabFolderTest` (green); the renderer properties have no test coverage (Phase 1 scoping decision), hence the strictly shape-for-shape translation.
+Remaining Phase 5 work: sweep the `css2` package for further regular cohorts; the survey found none as clean as the CTabFolder set, so the remainder may be small or empty.
+Note for local builds: since #4122, `css.swt` no longer compiles against the 4.41 I-build target platform alone; put `css.core` in the same reactor (`-pl bundles/org.eclipse.e4.ui.css.core,bundles/org.eclipse.e4.ui.css.swt,...`) until an I-build containing #4122 is in the target.
 
 ### Phase 6 — merge `css.swt.theme` into `css.swt`
 
