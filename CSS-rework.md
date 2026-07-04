@@ -160,4 +160,4 @@ Scaffolding already covers what later phases need:
 - `CSSSWTTestCase` — Display + engine lifecycle, `createEngine(...)`, `createTestLabel(...)`.
 - `EclipsePreferencesHandlerTest` — reference pattern for handler tests with Mockito; use it when adding Phase 5 handler tests.
 
-Low-priority follow-up: replace `CSSSWTTestCase` inheritance (~25 widget tests) with a JUnit 5 `@RegisterExtension CssSwtEngine` callback, dropping the protected mutable `display` field and freeing those tests to extend other bases.
+The `CSSSWTTestCase` inheritance was replaced by a JUnit 5 `@RegisterExtension CssSwtEngine` callback (draft PR #4162, branch `css-swt-test-extension`): 36 files, all ~25 widget tests migrated, the protected mutable `display` field replaced by accessors, suite totals unchanged (210 tests, 0 failures, 9 skipped).
