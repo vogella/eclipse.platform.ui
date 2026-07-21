@@ -911,6 +911,26 @@ public abstract class FilteredItemsSelectionDialog extends SelectionStatusDialog
 			tableViewer.setItemCount(contentProvider.getNumberOfElements());
 			tableViewer.refresh();
 
+			// ⚠️ DEMONSTRATION: Inject delay to make race condition reproducible
+			// This simulates what happens on slow systems where tableViewer.refresh()
+			// takes longer to complete. On fast systems, the race condition is intermittent
+			// because refresh() usually completes quickly enough. This delay makes it
+			// fail consistently by preventing the table from being ready when setSelection()
+			// is called below.
+			//
+			// To see the race condition:
+			// 1. Compile this code
+			// 2. Run ResourceInitialSelectionTest
+			// 3. Tests will fail with: expected:<[...foo.txt]> but was:<[]>
+			//
+			// This demonstrates the root cause that was fixed by using Display.asyncExec()
+			// in commit 33748d2f3a.
+			try {
+				Thread.sleep(500);  // 500ms delay - makes race condition 100% reproducible
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+			}
+
 			if (tableViewer.getTable().getItemCount() > 0) {
 				if (isShownForTheFirstTime) {
 					isShownForTheFirstTime = false;
