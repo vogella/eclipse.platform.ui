@@ -16,9 +16,7 @@ package org.eclipse.ui.internal.decorators;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.Set;
-import java.util.StringTokenizer;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IConfigurationElement;
 import org.eclipse.core.runtime.IExtension;
@@ -35,6 +33,7 @@ import org.eclipse.core.runtime.dynamichelpers.IExtensionTracker;
 import org.eclipse.jface.resource.JFaceResources;
 import org.eclipse.jface.resource.LocalResourceManager;
 import org.eclipse.jface.resource.ResourceManager;
+import org.eclipse.jface.util.IPropertyChangeListener;
 import org.eclipse.jface.viewers.DecorationContext;
 import org.eclipse.jface.viewers.IBaseLabelProvider;
 import org.eclipse.jface.viewers.IColorDecorator;
@@ -60,6 +59,7 @@ import org.eclipse.ui.internal.registry.IWorkbenchRegistryConstants;
 import org.eclipse.ui.internal.util.PrefUtil;
 import org.eclipse.ui.internal.util.Util;
 import org.eclipse.ui.progress.WorkbenchJob;
+import org.eclipse.ui.themes.IThemeManager;
 
 /**
  * The DecoratorManager is the class that handles all of the decorators defined
@@ -103,6 +103,8 @@ public class DecoratorManager implements ILabelProviderListener, IDecoratorManag
 	private static final String P_FALSE = "false"; //$NON-NLS-1$
 
 	private LocalResourceManager resourceManager;
+
+	private IPropertyChangeListener themeListener;
 
 	/**
 	 * ManagedWorkbenchLabelDecorator is the internal LabelDecorator passed as
@@ -225,6 +227,46 @@ public class DecoratorManager implements ILabelProviderListener, IDecoratorManag
 	 */
 	public void schedule() {
 		scheduler.schedule();
+		installThemeListener();
+	}
+
+	/**
+	 * Install a listener on the workbench theme manager so that decoration results
+	 * that cached colors or fonts from the theme registries get invalidated when a
+	 * theme-related property changes. {@link IThemeManager} forwards property
+	 * changes from the current theme's color and font registries and fires
+	 * {@link IThemeManager#CHANGE_CURRENT_THEME} on theme switches, which together
+	 * cover both the workbench-startup race and runtime theme switches.
+	 */
+	private void installThemeListener() {
+		if (themeListener != null || !PlatformUI.isWorkbenchRunning()) {
+			return;
+		}
+		themeListener = event -> handleThemeChange();
+		PlatformUI.getWorkbench().getThemeManager().addPropertyChangeListener(themeListener);
+	}
+
+	private void removeThemeListener() {
+		if (themeListener == null || !PlatformUI.isWorkbenchRunning()) {
+			themeListener = null;
+			return;
+		}
+		PlatformUI.getWorkbench().getThemeManager().removePropertyChangeListener(themeListener);
+		themeListener = null;
+	}
+
+	/**
+	 * Invalidate decoration results and notify viewers when theme colors or fonts
+	 * change. Cached {@link DecorationResult}s hold {@link Color} and {@link Font}
+	 * references obtained from the theme registries at decoration time, and those
+	 * references can outlive the theme that produced them.
+	 */
+	private void handleThemeChange() {
+		if (!PlatformUI.isWorkbenchRunning()) {
+			return;
+		}
+		scheduler.clearResults();
+		fireListenersInUIThread(new LabelProviderChangedEvent(this));
 	}
 
 	/**
@@ -236,10 +278,8 @@ public class DecoratorManager implements ILabelProviderListener, IDecoratorManag
 
 		ArrayList<DecoratorDefinition> full = new ArrayList<>();
 		ArrayList<DecoratorDefinition> lightweight = new ArrayList<>();
-		Iterator<DecoratorDefinition> allDefinitions = values.iterator();
 		IExtensionTracker configurationElementTracker = PlatformUI.getWorkbench().getExtensionTracker();
-		while (allDefinitions.hasNext()) {
-			DecoratorDefinition nextDefinition = allDefinitions.next();
+		for (DecoratorDefinition nextDefinition : values) {
 			if (nextDefinition.isFull()) {
 				full.add(nextDefinition);
 			} else {
@@ -250,12 +290,10 @@ public class DecoratorManager implements ILabelProviderListener, IDecoratorManag
 					nextDefinition, IExtensionTracker.REF_WEAK);
 		}
 
-		fullDefinitions = new FullDecoratorDefinition[full.size()];
-		full.toArray(fullDefinitions);
+		fullDefinitions = full.toArray(new FullDecoratorDefinition[0]);
 
-		LightweightDecoratorDefinition[] lightweightDefinitions = new LightweightDecoratorDefinition[lightweight
-				.size()];
-		lightweight.toArray(lightweightDefinitions);
+		LightweightDecoratorDefinition[] lightweightDefinitions = lightweight
+				.toArray(new LightweightDecoratorDefinition[0]);
 
 		lightweightManager = new LightweightDecoratorManager(lightweightDefinitions);
 
@@ -699,14 +737,16 @@ public class DecoratorManager implements ILabelProviderListener, IDecoratorManag
 		String preferenceValue = WorkbenchPlugin.getDefault().getPreferenceStore()
 				.getString(IPreferenceConstants.ENABLED_DECORATORS);
 
-		StringTokenizer tokenizer = new StringTokenizer(preferenceValue, PREFERENCE_SEPARATOR);
 		Set<String> enabledIds = new HashSet<>();
 		Set<String> disabledIds = new HashSet<>();
-		while (tokenizer.hasMoreTokens()) {
-			String nextValuePair = tokenizer.nextToken();
-
-			// Strip out the true or false to get the id
-			String id = nextValuePair.substring(0, nextValuePair.indexOf(VALUE_SEPARATOR));
+		for (String nextValuePair : preferenceValue.split(PREFERENCE_SEPARATOR)) {
+			// Skip empty tokens (leading or consecutive separators) and
+			// malformed entries without a VALUE_SEPARATOR.
+			int separatorIndex = nextValuePair.indexOf(VALUE_SEPARATOR);
+			if (separatorIndex == -1) {
+				continue;
+			}
+			String id = nextValuePair.substring(0, separatorIndex);
 			if (nextValuePair.endsWith(P_TRUE)) {
 				enabledIds.add(id);
 			} else {
@@ -740,6 +780,7 @@ public class DecoratorManager implements ILabelProviderListener, IDecoratorManag
 	 * dispose() will be called on them.
 	 */
 	public void shutdown() {
+		removeThemeListener();
 		scheduler.shutdown();
 		// Disable all of the enabled decorators
 		// so as to force a dispose of thier decorators

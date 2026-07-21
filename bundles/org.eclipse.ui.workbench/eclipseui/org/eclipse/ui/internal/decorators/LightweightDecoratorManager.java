@@ -43,20 +43,7 @@ public class LightweightDecoratorManager extends ObjectContributorManager {
 
 	private static class LightweightRunnable implements ISafeRunnable {
 
-		static class RunnableData {
-
-			final DecorationBuilder builder;
-
-			final LightweightDecoratorDefinition decorator;
-
-			final Object element;
-
-			public RunnableData(Object object, DecorationBuilder builder, LightweightDecoratorDefinition definition) {
-				this.element = object;
-				this.builder = builder;
-				this.decorator = definition;
-			}
-
+		record RunnableData(Object element, DecorationBuilder builder, LightweightDecoratorDefinition decorator) {
 			boolean isConsistent() {
 				return builder != null && decorator != null && element != null;
 			}
@@ -74,7 +61,7 @@ public class LightweightDecoratorManager extends ObjectContributorManager {
 		@Override
 		public void handleException(Throwable exception) {
 			IStatus status = StatusUtil.newStatus(IStatus.ERROR, exception.getMessage(), exception);
-			LightweightDecoratorDefinition decorator = data.decorator;
+			LightweightDecoratorDefinition decorator = data.decorator();
 			String message;
 			if (decorator == null) {
 				message = WorkbenchMessages.DecoratorError;
@@ -102,7 +89,7 @@ public class LightweightDecoratorManager extends ObjectContributorManager {
 			// https://bugs.eclipse.org/bugs/show_bug.cgi?id=300358
 			RunnableData data = this.data;
 			if (data.isConsistent()) {
-				data.decorator.decorate(data.element, data.builder);
+				data.decorator().decorate(data.element(), data.builder());
 			}
 			clearReferences();
 		}
@@ -251,9 +238,7 @@ public class LightweightDecoratorManager extends ObjectContributorManager {
 				result.add(lightweightDefinition);
 			}
 		}
-		LightweightDecoratorDefinition[] returnArray = new LightweightDecoratorDefinition[result.size()];
-		result.toArray(returnArray);
-		return returnArray;
+		return result.toArray(new LightweightDecoratorDefinition[0]);
 	}
 
 	/**
