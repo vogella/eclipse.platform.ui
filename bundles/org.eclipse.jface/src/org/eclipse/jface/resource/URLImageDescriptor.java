@@ -352,12 +352,24 @@ class URLImageDescriptor extends ImageDescriptor implements IAdaptable {
 		}
 	}
 
+	/**
+	 * Resolves the given URL string. This is the single place where this descriptor
+	 * turns a URL string into a URL, so applying the modifier here covers the plain,
+	 * the zoomed and the adapter code paths alike.
+	 */
 	private static URL getURL(String urlString) {
 		URL result = null;
 		try {
 			result = new URL(urlString);
 		} catch (MalformedURLException e) {
 			Policy.logException(e);
+		}
+		IImageURLModifier modifier = getURLModifier();
+		if (result != null && modifier != null) {
+			URL modified = modifier.modifyURL(result);
+			if (modified != null) {
+				result = modified;
+			}
 		}
 		return result;
 	}

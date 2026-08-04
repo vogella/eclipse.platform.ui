@@ -33,6 +33,7 @@ import org.eclipse.jface.resource.ImageDescriptor;
 import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.graphics.ImageData;
 import org.eclipse.swt.graphics.ImageFileNameProvider;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -200,6 +201,103 @@ public class UrlImageDescriptorTest {
 		ImageData imageDataURL200 = descriptorFromUrl.getImageData(200);
 		assertEquals(imageDataOrig200.width, imageDataURL200.width);
 		assertEquals(imageDataOrig200.height, imageDataURL200.height);
+	}
+
+	@AfterEach
+	public void clearURLModifier() {
+		ImageDescriptor.setURLModifier(null);
+	}
+
+	@Test
+	public void testNoURLModifierInstalledByDefault() {
+		assertNull(ImageDescriptor.getURLModifier());
+
+		ImageDescriptor descriptor = ImageDescriptor
+				.createFromURL(FileImageDescriptorTest.class.getResource("/icons/imagetests/zoomIn.png"));
+		assertEquals("zoomIn.png", IPath.fromOSString(imagePath(descriptor, 100)).lastSegment());
+	}
+
+	@Test
+	public void testURLModifierRedirectsImageData() {
+		URL zoomIn = FileImageDescriptorTest.class.getResource("/icons/imagetests/zoomIn.png");
+		URL rectangular = FileImageDescriptorTest.class.getResource("/icons/imagetests/rectangular-57x16.png");
+		ImageData original = ImageDescriptor.createFromURL(zoomIn).getImageData(100);
+		ImageData replacement = ImageDescriptor.createFromURL(rectangular).getImageData(100);
+		assertNotEquals(original.width, replacement.width, "test images are indistinguishable");
+
+		ImageDescriptor descriptor = ImageDescriptor.createFromURL(zoomIn);
+		ImageDescriptor.setURLModifier(url -> zoomIn.toExternalForm().equals(url.toExternalForm()) ? rectangular : url);
+
+		assertEquals(replacement.width, descriptor.getImageData(100).width);
+	}
+
+	@Test
+	public void testURLModifierLeavesUnmatchedURLsAlone() {
+		ImageDescriptor descriptor = ImageDescriptor
+				.createFromURL(FileImageDescriptorTest.class.getResource("/icons/imagetests/zoomIn.png"));
+		ImageDescriptor.setURLModifier(url -> url);
+
+		assertEquals("zoomIn.png", IPath.fromOSString(imagePath(descriptor, 100)).lastSegment());
+	}
+
+	@Test
+	public void testURLModifierReturningNullKeepsOriginalURL() {
+		ImageDescriptor descriptor = ImageDescriptor
+				.createFromURL(FileImageDescriptorTest.class.getResource("/icons/imagetests/zoomIn.png"));
+		ImageDescriptor.setURLModifier(url -> null);
+
+		assertEquals("zoomIn.png", IPath.fromOSString(imagePath(descriptor, 100)).lastSegment());
+	}
+
+	@Test
+	public void testURLModifierIsClearedByNull() {
+		URL zoomIn = FileImageDescriptorTest.class.getResource("/icons/imagetests/zoomIn.png");
+		URL rectangular = FileImageDescriptorTest.class.getResource("/icons/imagetests/rectangular-57x16.png");
+		ImageDescriptor descriptor = ImageDescriptor.createFromURL(zoomIn);
+
+		ImageDescriptor.setURLModifier(url -> rectangular);
+		assertEquals("rectangular-57x16.png", IPath.fromOSString(imagePath(descriptor, 100)).lastSegment());
+
+		ImageDescriptor.setURLModifier(null);
+		assertNull(ImageDescriptor.getURLModifier());
+		assertEquals("zoomIn.png", IPath.fromOSString(imagePath(descriptor, 100)).lastSegment());
+	}
+
+	/**
+	 * The @2x variant has to be derived from the rewritten URL, not from the
+	 * original one, so an icon pack only needs to supply the base name.
+	 */
+	@Test
+	public void testURLModifierIsAppliedBeforeHiDpiLookup() {
+		URL rectangular = FileImageDescriptorTest.class.getResource("/icons/imagetests/rectangular-57x16.png");
+		URL zoomIn = FileImageDescriptorTest.class.getResource("/icons/imagetests/zoomIn.png");
+		ImageDescriptor descriptor = ImageDescriptor.createFromURL(rectangular);
+
+		ImageDescriptor.setURLModifier(url -> url.getPath().contains("rectangular-57x16") ? zoomIn : url);
+
+		assertEquals("zoomIn.png", IPath.fromOSString(imagePath(descriptor, 100)).lastSegment());
+		assertEquals("zoomIn@2x.png", IPath.fromOSString(imagePath(descriptor, 200)).lastSegment());
+	}
+
+	@Test
+	public void testURLModifierIsAppliedToAdaptedURL() {
+		URL zoomIn = FileImageDescriptorTest.class.getResource("/icons/imagetests/zoomIn.png");
+		URL rectangular = FileImageDescriptorTest.class.getResource("/icons/imagetests/rectangular-57x16.png");
+		ImageDescriptor descriptor = ImageDescriptor.createFromURL(zoomIn);
+
+		ImageDescriptor.setURLModifier(url -> rectangular);
+
+		URL adapted = Adapters.adapt(descriptor, URL.class);
+		assertNotNull(adapted, "URLImageDescriptor does not adapt to URL");
+		assertEquals(rectangular.toExternalForm(), adapted.toExternalForm());
+	}
+
+	private static String imagePath(ImageDescriptor descriptor, int zoom) {
+		ImageFileNameProvider fileNameProvider = Adapters.adapt(descriptor, ImageFileNameProvider.class);
+		assertNotNull(fileNameProvider, "URLImageDescriptor does not adapt to ImageFileNameProvider");
+		String path = fileNameProvider.getImagePath(zoom);
+		assertNotNull(path, "URLImageDescriptor ImageFileNameProvider does not return the " + zoom + "% path");
+		return path;
 	}
 
 }
