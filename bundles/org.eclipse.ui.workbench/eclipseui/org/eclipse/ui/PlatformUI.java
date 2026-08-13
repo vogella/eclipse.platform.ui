@@ -26,6 +26,7 @@ import org.eclipse.jface.preference.IPreferenceStore;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.ui.application.WorkbenchAdvisor;
+import org.eclipse.ui.internal.ImageDecodingWarmUp;
 import org.eclipse.ui.internal.Workbench;
 import org.eclipse.ui.internal.WorkbenchMessages;
 import org.eclipse.ui.internal.WorkbenchPlugin;
@@ -182,6 +183,8 @@ public final class PlatformUI {
 	 * @since 3.0
 	 */
 	public static Display createDisplay() {
+		// before Workbench is loaded, so the warm-up gets a head start
+		ImageDecodingWarmUp.start();
 		return Workbench.createDisplay();
 	}
 
