@@ -572,4 +572,112 @@ public class SmartImportTests {
 			org.eclipse.core.tests.harness.FileSystemHelper.clear(tempDir.toFile());
 		}
 	}
+
+	/**
+	 * Creates a directory containing an 'importme' marker file.
+	 */
+	private static File createImportableDirectory(File parent, String path) throws IOException {
+		File directory = new File(parent, path);
+		assertTrue("Could not create " + directory, directory.mkdirs());
+		new File(directory, "importme").createNewFile();
+		return directory;
+	}
+
+	/**
+	 * Layout used by the build output detection tests:
+	 *
+	 * <pre>
+	 * maven/pom.xml, maven/importme, maven/target/generated/importme
+	 * pomless/importme, pomless/target/nested/importme
+	 * </pre>
+	 */
+	private static void createBuildOutputLayout(File root) throws IOException {
+		File mavenProject = createImportableDirectory(root, "maven");
+		new File(mavenProject, "pom.xml").createNewFile();
+		createImportableDirectory(mavenProject, "target/generated");
+
+		// a Tycho pomless bundle has no pom.xml but still gets a target folder
+		File pomlessProject = createImportableDirectory(root, "pomless");
+		createImportableDirectory(pomlessProject, "target/nested");
+	}
+
+	@Test
+	public void testSmartImportJobSkipsBuildOutputFolders() throws Exception {
+		java.nio.file.Path tempDir = Files.createTempDirectory("smartImportBuildOutputTest");
+		try {
+			createBuildOutputLayout(tempDir.toFile());
+
+			SmartImportJob job = new SmartImportJob(tempDir.toFile(), Collections.emptySet(), true, true);
+			Set<File> proposals = job.getImportProposals(new NullProgressMonitor()).keySet();
+
+			assertTrue("The projects themselves must still be proposed",
+					proposals.containsAll(Arrays.asList(new File(tempDir.toFile(), "maven"),
+							new File(tempDir.toFile(), "pomless"))));
+			assertFalse("Content of 'target' must not be proposed",
+					proposals.contains(new File(tempDir.toFile(), "maven/target/generated")));
+			assertFalse("Content of 'target' must not be proposed even without a sibling pom.xml",
+					proposals.contains(new File(tempDir.toFile(), "pomless/target/nested")));
+		} finally {
+			org.eclipse.core.tests.harness.FileSystemHelper.clear(tempDir.toFile());
+		}
+	}
+
+	@Test
+	public void testSmartImportJobBuildOutputFolderNamesAreConfigurable() throws Exception {
+		java.nio.file.Path tempDir = Files.createTempDirectory("smartImportBuildOutputTest");
+		try {
+			createBuildOutputLayout(tempDir.toFile());
+
+			SmartImportJob job = new SmartImportJob(tempDir.toFile(), Collections.emptySet(), true, true);
+			job.setBuildOutputFolderNames(Collections.singleton("build"));
+			Set<File> proposals = job.getImportProposals(new NullProgressMonitor()).keySet();
+
+			assertTrue("'target' must be crawled again once removed from the list",
+					proposals.contains(new File(tempDir.toFile(), "maven/target/generated")));
+		} finally {
+			org.eclipse.core.tests.harness.FileSystemHelper.clear(tempDir.toFile());
+		}
+	}
+
+	@Test
+	public void testSmartImportJobEmptyBuildOutputFolderNamesDisablesFilter() throws Exception {
+		java.nio.file.Path tempDir = Files.createTempDirectory("smartImportBuildOutputTest");
+		try {
+			createBuildOutputLayout(tempDir.toFile());
+
+			SmartImportJob job = new SmartImportJob(tempDir.toFile(), Collections.emptySet(), true, true);
+			job.setBuildOutputFolderNames(Collections.emptySet());
+			Set<File> proposals = job.getImportProposals(new NullProgressMonitor()).keySet();
+
+			assertTrue("An empty list must disable the filter",
+					proposals.containsAll(Arrays.asList(new File(tempDir.toFile(), "maven/target/generated"),
+							new File(tempDir.toFile(), "pomless/target/nested"))));
+		} finally {
+			org.eclipse.core.tests.harness.FileSystemHelper.clear(tempDir.toFile());
+		}
+	}
+
+	@Test
+	public void testSmartImportSkipsBuildOutputFoldersDuringCrawl() throws Exception {
+		java.nio.file.Path tempDir = Files.createTempDirectory("smartImportBuildOutputTest");
+		try {
+			createBuildOutputLayout(tempDir.toFile());
+
+			SmartImportWizard wizard = new SmartImportWizard();
+			wizard.setInitialImportSource(tempDir.toFile());
+			proceedSmartImportWizard(wizard);
+
+			Set<String> importedNames = new HashSet<>();
+			for (IProject project : ResourcesPlugin.getWorkspace().getRoot().getProjects()) {
+				importedNames.add(project.getName());
+				assertFalse("No project below a 'target' folder may be imported",
+						project.getLocation().toFile().getAbsolutePath()
+								.contains(File.separator + "target" + File.separator));
+			}
+			assertTrue("The projects themselves must be imported: " + importedNames,
+					importedNames.containsAll(Arrays.asList("maven", "pomless")));
+		} finally {
+			org.eclipse.core.tests.harness.FileSystemHelper.clear(tempDir.toFile());
+		}
+	}
 }

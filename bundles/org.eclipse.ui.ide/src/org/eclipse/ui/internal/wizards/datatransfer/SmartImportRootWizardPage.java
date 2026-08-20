@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -65,6 +66,7 @@ import org.eclipse.jface.wizard.ProgressMonitorPart;
 import org.eclipse.jface.wizard.WizardPage;
 import org.eclipse.osgi.util.NLS;
 import org.eclipse.swt.SWT;
+import org.eclipse.swt.events.FocusListener;
 import org.eclipse.swt.events.ModifyEvent;
 import org.eclipse.swt.events.ModifyListener;
 import org.eclipse.swt.events.SelectionAdapter;
@@ -84,6 +86,7 @@ import org.eclipse.swt.widgets.Event;
 import org.eclipse.swt.widgets.FileDialog;
 import org.eclipse.swt.widgets.Label;
 import org.eclipse.swt.widgets.Link;
+import org.eclipse.swt.widgets.Text;
 import org.eclipse.swt.widgets.ToolBar;
 import org.eclipse.swt.widgets.ToolItem;
 import org.eclipse.swt.widgets.TreeColumn;
@@ -124,6 +127,8 @@ public class SmartImportRootWizardPage extends WizardPage {
 
 	private static final String STORE_SKIP_DOT_FOLDERS = "SmartImportRootWizardPage.STORE_SKIP_DOT_FOLDERS"; //$NON-NLS-1$
 
+	private static final String STORE_BUILD_OUTPUT_FOLDER_NAMES = "SmartImportRootWizardPage.STORE_BUILD_OUTPUT_FOLDER_NAMES"; //$NON-NLS-1$
+
 	// Root
 	private File selection;
 	private Combo rootDirectoryText;
@@ -140,6 +145,7 @@ public class SmartImportRootWizardPage extends WizardPage {
 	private boolean detectNestedProjects = true;
 	private boolean configureProjects = true;
 	private boolean skipDotFolders = true;
+	private Set<String> buildOutputFolderNames = SmartImportJob.DEFAULT_BUILD_OUTPUT_FOLDER_NAMES;
 	// Working sets
 	private Set<IWorkingSet> workingSets;
 	private WorkingSetGroup workingSetsGroup;
@@ -492,6 +498,21 @@ public class SmartImportRootWizardPage extends WizardPage {
 				refreshProposals();
 			}
 		});
+
+		Label buildOutputFoldersLabel = new Label(parent, SWT.NONE);
+		buildOutputFoldersLabel.setText(DataTransferMessages.SmartImportWizardPage_buildOutputFolders);
+		buildOutputFoldersLabel.setToolTipText(DataTransferMessages.SmartImportWizardPage_buildOutputFolders_tooltip);
+		final Text buildOutputFoldersText = new Text(parent, SWT.BORDER);
+		buildOutputFoldersText.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false, 3, 1));
+		buildOutputFoldersText.setToolTipText(DataTransferMessages.SmartImportWizardPage_buildOutputFolders_tooltip);
+		buildOutputFoldersText.setText(String.join(", ", this.buildOutputFolderNames)); //$NON-NLS-1$
+		buildOutputFoldersText.addModifyListener(
+				e -> SmartImportRootWizardPage.this.buildOutputFolderNames = parseFolderNames(
+						buildOutputFoldersText.getText()));
+		// re-crawling on every keystroke would be far too expensive
+		buildOutputFoldersText.addFocusListener(FocusListener.focusLostAdapter(e -> refreshProposals()));
+		buildOutputFoldersText
+				.addSelectionListener(SelectionListener.widgetDefaultSelectedAdapter(e -> refreshProposals()));
 
 		Button closeProjectsCheckbox = new Button(parent, SWT.CHECK);
 		closeProjectsCheckbox.setText(DataTransferMessages.SmartImportWizardPage_closeProjectsAfterImport);
@@ -924,6 +945,24 @@ public class SmartImportRootWizardPage extends WizardPage {
 		return skipDotFolders;
 	}
 
+	/**
+	 * @return the names of the folders that are not searched for nested projects
+	 */
+	Set<String> getBuildOutputFolderNames() {
+		return buildOutputFolderNames;
+	}
+
+	private static Set<String> parseFolderNames(String commaSeparatedNames) {
+		Set<String> names = new LinkedHashSet<>();
+		for (String name : commaSeparatedNames.split(",")) { //$NON-NLS-1$
+			String trimmed = name.trim();
+			if (!trimmed.isEmpty()) {
+				names.add(trimmed);
+			}
+		}
+		return names;
+	}
+
 	private void refreshProposals() {
 		stopAndDisconnectCurrentWork();
 		this.potentialProjects = Collections.emptyMap();
@@ -1058,6 +1097,9 @@ public class SmartImportRootWizardPage extends WizardPage {
 			if (dialogSettings.get(STORE_SKIP_DOT_FOLDERS) != null) {
 				skipDotFolders = dialogSettings.getBoolean(STORE_SKIP_DOT_FOLDERS);
 			}
+			if (dialogSettings.get(STORE_BUILD_OUTPUT_FOLDER_NAMES) != null) {
+				buildOutputFolderNames = parseFolderNames(dialogSettings.get(STORE_BUILD_OUTPUT_FOLDER_NAMES));
+			}
 		}
 	}
 
@@ -1072,6 +1114,7 @@ public class SmartImportRootWizardPage extends WizardPage {
 			dialogSettings.put(STORE_NESTED_PROJECTS, detectNestedProjects);
 			dialogSettings.put(STORE_CONFIGURE_NATURES, configureProjects);
 			dialogSettings.put(STORE_SKIP_DOT_FOLDERS, skipDotFolders);
+			dialogSettings.put(STORE_BUILD_OUTPUT_FOLDER_NAMES, String.join(",", buildOutputFolderNames)); //$NON-NLS-1$
 		}
 	}
 

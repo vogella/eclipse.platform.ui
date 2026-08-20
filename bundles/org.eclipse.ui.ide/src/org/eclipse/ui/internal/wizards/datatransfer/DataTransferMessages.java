@@ -188,6 +188,8 @@ public class DataTransferMessages extends NLS {
 	public static String SmartImportWizardPage_showOtherSpecializedImportWizard;
 	public static String SmartImportWizardPage_closeProjectsAfterImport;
 	public static String SmartImportWizardPage_skipDotFolders;
+	public static String SmartImportWizardPage_buildOutputFolders;
+	public static String SmartImportWizardPage_buildOutputFolders_tooltip;
 
 	public static String SmartImportJob_discardRootProject_title;
 	public static String SmartImportJob_discardRootProject_description;

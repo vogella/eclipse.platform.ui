@@ -289,6 +289,7 @@ public class SmartImportWizard extends Wizard implements IImportWizard {
 		this.easymportJob.setWorkingSets(projectRootPage.getSelectedWorkingSets());
 		this.easymportJob.setCloseProjectsAfterImport(projectRootPage.isCloseProjectsAfterImport());
 		this.easymportJob.setSkipDotFolders(projectRootPage.isSkipDotFolders());
+		this.easymportJob.setBuildOutputFolderNames(projectRootPage.getBuildOutputFolderNames());
 
 		return this.easymportJob;
 	}
@@ -339,7 +340,8 @@ public class SmartImportWizard extends Wizard implements IImportWizard {
 				|| (isValidArchive(pageRoot) && getExpandDirectory(pageRoot).getAbsoluteFile().equals(jobRoot));
 		return sameSource && job.isDetectNestedProjects() == page.isDetectNestedProject()
 				&& job.isConfigureProjects() == page.isConfigureProjects()
-				&& job.isSkipDotFolders() == page.isSkipDotFolders();
+				&& job.isSkipDotFolders() == page.isSkipDotFolders()
+				&& job.getBuildOutputFolderNames().equals(page.getBuildOutputFolderNames());
 	}
 
 }

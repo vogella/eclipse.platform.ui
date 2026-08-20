@@ -20,6 +20,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -64,6 +65,13 @@ import org.eclipse.ui.wizards.datatransfer.ProjectConfigurator;
  */
 public class SmartImportJob extends Job {
 
+	/**
+	 * Names of the folders that are not searched for nested projects by default,
+	 * following the Maven and Gradle conventions.
+	 */
+	public static final Set<String> DEFAULT_BUILD_OUTPUT_FOLDER_NAMES = Collections
+			.unmodifiableSet(new LinkedHashSet<>(List.of("target", "build"))); //$NON-NLS-1$ //$NON-NLS-2$
+
 	/*
 	 * Input parameters
 	 */
@@ -75,6 +83,7 @@ public class SmartImportJob extends Job {
 	private final boolean configureProjects;
 	private boolean closeProjectsAfterImport;
 	private boolean skipDotFolders = true;
+	private Set<String> buildOutputFolderNames = DEFAULT_BUILD_OUTPUT_FOLDER_NAMES;
 	private boolean reconfigureEclipseProjects;
 	private IWorkingSet[] workingSets;
 
@@ -355,6 +364,9 @@ public class SmartImportJob extends Job {
 				if (location == null) {
 					continue;
 				}
+				if (this.buildOutputFolderNames.contains(childResource.getName())) {
+					continue;
+				}
 				boolean excluded = false;
 				if (directoriesToExclude != null) {
 					for (IPath excludedPath : directoriesToExclude) {
@@ -546,6 +558,17 @@ public class SmartImportJob extends Job {
 		return false;
 	}
 
+	private boolean isInsideBuildOutputFolder(File file) {
+		File current = file;
+		while (current != null && !current.equals(this.rootDirectory)) {
+			if (this.buildOutputFolderNames.contains(current.getName())) {
+				return true;
+			}
+			current = current.getParentFile();
+		}
+		return false;
+	}
+
 	/**
 	 * @param refreshMode One {@link IResource#BACKGROUND_REFRESH} for background refresh, or {@link IResource#NONE} for immediate refresh
 	 */
@@ -703,6 +726,7 @@ public class SmartImportJob extends Job {
 			if (this.skipDotFolders) {
 				res.keySet().removeIf(SmartImportJob::isInsideDotFolder);
 			}
+			res.keySet().removeIf(this::isInsideBuildOutputFolder);
 			this.importProposals = res;
 		}
 		return this.importProposals;
@@ -756,6 +780,31 @@ public class SmartImportJob extends Job {
 	 */
 	public boolean isSkipDotFolders() {
 		return this.skipDotFolders;
+	}
+
+	/**
+	 * Sets the names of the folders that are not searched for nested projects.
+	 * Folders are matched by name only, so a Java package named 'target' is skipped
+	 * as well. An empty collection disables this filter.
+	 *
+	 * @see #DEFAULT_BUILD_OUTPUT_FOLDER_NAMES
+	 */
+	public void setBuildOutputFolderNames(Collection<String> buildOutputFolderNames) {
+		Set<String> names = new LinkedHashSet<>();
+		for (String name : buildOutputFolderNames) {
+			String trimmed = name.trim();
+			if (!trimmed.isEmpty()) {
+				names.add(trimmed);
+			}
+		}
+		this.buildOutputFolderNames = Collections.unmodifiableSet(names);
+	}
+
+	/**
+	 * @return the names of the folders that are not searched for nested projects
+	 */
+	public Set<String> getBuildOutputFolderNames() {
+		return this.buildOutputFolderNames;
 	}
 
 	/**
