@@ -462,26 +462,9 @@ public class WorkbenchWindow implements IWorkbenchWindow {
 			final IEclipseContext windowContext = model.getContext();
 			HandlerServiceImpl.push(windowContext.getParent(), null);
 
-			// Initialize a previous 'saved' state if applicable. We no longer
-			// update the preference store.
-			if (getModel().getPersistedState().containsKey(IPreferenceConstants.COOLBAR_VISIBLE)) {
-				this.coolBarVisible = Boolean
-						.parseBoolean(getModel().getPersistedState().get(IPreferenceConstants.COOLBAR_VISIBLE));
-			} else {
-				this.coolBarVisible = PrefUtil.getInternalPreferenceStore()
-						.getBoolean(IPreferenceConstants.COOLBAR_VISIBLE);
-				getModel().getPersistedState().put(IPreferenceConstants.COOLBAR_VISIBLE,
-						Boolean.toString(this.coolBarVisible));
-			}
-			if (getModel().getPersistedState().containsKey(IPreferenceConstants.PERSPECTIVEBAR_VISIBLE)) {
-				this.perspectiveBarVisible = Boolean
-						.parseBoolean(getModel().getPersistedState().get(IPreferenceConstants.PERSPECTIVEBAR_VISIBLE));
-			} else {
-				this.perspectiveBarVisible = PrefUtil.getInternalPreferenceStore()
-						.getBoolean(IPreferenceConstants.PERSPECTIVEBAR_VISIBLE);
-				getModel().getPersistedState().put(IPreferenceConstants.PERSPECTIVEBAR_VISIBLE,
-						Boolean.toString(this.perspectiveBarVisible));
-			}
+			this.coolBarVisible = readTrimVisibility(IPreferenceConstants.COOLBAR_VISIBLE);
+			this.perspectiveBarVisible = readTrimVisibility(IPreferenceConstants.PERSPECTIVEBAR_VISIBLE);
+			PrefUtil.getInternalPreferenceStore().addPropertyChangeListener(trimVisibilityListener);
 
 			IServiceLocatorCreator slc = workbench.getService(IServiceLocatorCreator.class);
 			this.serviceLocator = (ServiceLocator) slc.createServiceLocator(workbench, null, () -> {
@@ -956,6 +939,7 @@ public class WorkbenchWindow implements IWorkbenchWindow {
 
 	@PreDestroy
 	void preDestroy() {
+		PrefUtil.getInternalPreferenceStore().removePropertyChangeListener(trimVisibilityListener);
 		if (mainMenu != null) {
 			renderer.clearModelToManager(mainMenu, menuManager);
 			mainMenu = null;
@@ -1499,6 +1483,8 @@ public class WorkbenchWindow implements IWorkbenchWindow {
 	private boolean perspectiveBarVisible = true;
 
 	private boolean statusLineVisible = true;
+
+	private final IPropertyChangeListener trimVisibilityListener = this::preferredTrimVisibilityChanged;
 
 	/**
 	 * The handlers for global actions that were last submitted to the workbench
@@ -2767,14 +2753,21 @@ public class WorkbenchWindow implements IWorkbenchWindow {
 	 * @since 3.0
 	 */
 	public void setCoolBarVisible(boolean visible) {
+		if (applyCoolBarVisible(visible)) {
+			recordTrimOverride(IPreferenceConstants.COOLBAR_VISIBLE, visible);
+		}
+	}
+
+	private boolean applyCoolBarVisible(boolean visible) {
 		boolean oldValue = coolBarVisible;
 		coolBarVisible = visible;
-		if (oldValue != coolBarVisible) {
-			getModel().getPersistedState().put(IPreferenceConstants.COOLBAR_VISIBLE, Boolean.toString(visible));
-			updateLayoutDataForContents();
-			firePropertyChanged(PROP_COOLBAR_VISIBLE, oldValue ? Boolean.TRUE : Boolean.FALSE,
-					coolBarVisible ? Boolean.TRUE : Boolean.FALSE);
+		if (oldValue == coolBarVisible) {
+			return false;
 		}
+		updateLayoutDataForContents();
+		firePropertyChanged(PROP_COOLBAR_VISIBLE, oldValue ? Boolean.TRUE : Boolean.FALSE,
+				coolBarVisible ? Boolean.TRUE : Boolean.FALSE);
+		return true;
 	}
 
 	/**
@@ -2805,14 +2798,21 @@ public class WorkbenchWindow implements IWorkbenchWindow {
 	 * @since 3.0
 	 */
 	public void setPerspectiveBarVisible(boolean visible) {
+		if (applyPerspectiveBarVisible(visible)) {
+			recordTrimOverride(IPreferenceConstants.PERSPECTIVEBAR_VISIBLE, visible);
+		}
+	}
+
+	private boolean applyPerspectiveBarVisible(boolean visible) {
 		boolean oldValue = perspectiveBarVisible;
 		perspectiveBarVisible = visible;
-		if (oldValue != perspectiveBarVisible) {
-			getModel().getPersistedState().put(IPreferenceConstants.PERSPECTIVEBAR_VISIBLE, Boolean.toString(visible));
-			updateLayoutDataForContents();
-			firePropertyChanged(PROP_PERSPECTIVEBAR_VISIBLE, oldValue ? Boolean.TRUE : Boolean.FALSE,
-					perspectiveBarVisible ? Boolean.TRUE : Boolean.FALSE);
+		if (oldValue == perspectiveBarVisible) {
+			return false;
 		}
+		updateLayoutDataForContents();
+		firePropertyChanged(PROP_PERSPECTIVEBAR_VISIBLE, oldValue ? Boolean.TRUE : Boolean.FALSE,
+				perspectiveBarVisible ? Boolean.TRUE : Boolean.FALSE);
+		return true;
 	}
 
 	/**
@@ -2964,6 +2964,65 @@ public class WorkbenchWindow implements IWorkbenchWindow {
 	public boolean isToolbarVisible() {
 		return (getCoolBarVisible() && getWindowConfigurer().getShowCoolBar())
 				|| (getPerspectiveBarVisible() && getWindowConfigurer().getShowPerspectiveBar());
+	}
+
+	/**
+	 * Returns the visibility of a trim element, preferring an explicit per-window
+	 * override over the workspace preference. An override that agrees with the
+	 * preference is dropped, so that windows which were only seeded with the
+	 * preference value follow it again.
+	 */
+	private boolean readTrimVisibility(String key) {
+		boolean preferred = PrefUtil.getInternalPreferenceStore().getBoolean(key);
+		String override = getModel().getPersistedState().get(key);
+		if (override == null) {
+			return preferred;
+		}
+		boolean visible = Boolean.parseBoolean(override);
+		if (visible == preferred) {
+			getModel().getPersistedState().remove(key);
+		}
+		return visible;
+	}
+
+	/**
+	 * Stores an explicit per-window choice, or removes it once it agrees with the
+	 * workspace preference again.
+	 */
+	private void recordTrimOverride(String key, boolean visible) {
+		if (visible == PrefUtil.getInternalPreferenceStore().getBoolean(key)) {
+			getModel().getPersistedState().remove(key);
+		} else {
+			getModel().getPersistedState().put(key, Boolean.toString(visible));
+		}
+	}
+
+	/**
+	 * Follows the workspace preference, unless this window carries an explicit
+	 * override. Themes change the preference while the workbench is running, so the
+	 * value cannot be read only once at window creation.
+	 */
+	private void preferredTrimVisibilityChanged(PropertyChangeEvent event) {
+		String key = event.getProperty();
+		if (!IPreferenceConstants.COOLBAR_VISIBLE.equals(key)
+				&& !IPreferenceConstants.PERSPECTIVEBAR_VISIBLE.equals(key)) {
+			return;
+		}
+		Display display = workbench.getDisplay();
+		if (display == null || display.isDisposed()) {
+			return;
+		}
+		display.asyncExec(() -> {
+			if (display.isDisposed()) {
+				return;
+			}
+			boolean visible = readTrimVisibility(key);
+			if (IPreferenceConstants.COOLBAR_VISIBLE.equals(key)) {
+				applyCoolBarVisible(visible);
+			} else {
+				applyPerspectiveBarVisible(visible);
+			}
+		});
 	}
 
 	private void updateLayoutDataForContents() {
