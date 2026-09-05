@@ -1768,6 +1768,19 @@
                label="%menu.window.appearance.label"
                mnemonic="%menu.window.appearance.mnemonic"
                tooltip="%menu.window.appearance.tooltip">
+            <menu
+                  id="org.eclipse.ui.appearance.themes"
+                  label="%menu.window.appearance.themes.label"
+                  mnemonic="%menu.window.appearance.themes.mnemonic">
+               <dynamic
+                     class="org.eclipse.ui.ExtensionFactory:themeContribution"
+                     id="org.eclipse.ui.menus.dynamicThemeMenu">
+               </dynamic>
+            </menu>
+            <separator
+                  name="org.eclipse.ui.window.appearance.themesSeparator"
+                  visible="true">
+            </separator>
             <command
                   commandId="org.eclipse.ui.ToggleCoolbarAction"
                   style="push"
