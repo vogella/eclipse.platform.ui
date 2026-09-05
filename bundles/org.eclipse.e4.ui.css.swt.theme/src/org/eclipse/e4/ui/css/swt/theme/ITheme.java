@@ -26,4 +26,12 @@ public interface ITheme {
 	 * @return the label
 	 */
 	String getLabel();
+
+	/**
+	 * Whether this theme is meant to be used with a dark appearance, as declared by
+	 * the <code>dark</code> attribute of the theme extension.
+	 */
+	default boolean isDark() {
+		return false;
+	}
 }
