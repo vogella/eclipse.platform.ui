@@ -33,10 +33,13 @@ import static org.mockito.Mockito.verify;
 import java.util.List;
 
 import org.eclipse.core.internal.preferences.EclipsePreferences;
+import org.eclipse.core.runtime.preferences.DefaultScope;
 import org.eclipse.core.runtime.preferences.IEclipsePreferences;
+import org.eclipse.core.runtime.preferences.InstanceScope;
 import org.junit.jupiter.api.Test;
 
 public class EclipsePreferencesHelperTest {
+	private static final String TEST_NODE = "org.eclipse.e4.ui.tests.css.swt.helpers";
 
 	@Test
 	void testAppendOverriddenPropertyName() {
@@ -109,5 +112,51 @@ public class EclipsePreferencesHelperTest {
 		assertTrue(overriddenPreferences.contains(SEPARATOR + "prop1" + SEPARATOR));
 		assertFalse(overriddenPreferences.contains(SEPARATOR + "prop2" + SEPARATOR));
 		assertTrue(overriddenPreferences.contains(SEPARATOR + "prop3" + SEPARATOR));
+	}
+
+	@Test
+	void testRemovedCssValueKeepsDifferingDefault() {
+		// given: CSS sets bold=false, the default stays true
+		IEclipsePreferences defaults = DefaultScope.INSTANCE.getNode(TEST_NODE);
+		IEclipsePreferences preferences = InstanceScope.INSTANCE.getNode(TEST_NODE);
+		try {
+			defaults.put("bold", "true");
+			preferences.put("bold", "false");
+			appendOverriddenPropertyName(preferences, "bold");
+
+			// when: user checks bold, the preference store removes the value equal to
+			// the default
+			preferences.remove("bold");
+
+			// then: the user value is stored and no longer owned by CSS
+			assertEquals("true", preferences.get("bold", null));
+			assertFalse(getOverriddenPropertyNames(preferences).contains("bold"));
+		} finally {
+			removeOverriddenPropertyNames(preferences);
+			preferences.remove("bold");
+			defaults.remove("bold");
+		}
+	}
+
+	@Test
+	void testRemovedCssValueEqualToDefaultStaysOwnedByCss() {
+		// given: CSS value and default are both false
+		IEclipsePreferences defaults = DefaultScope.INSTANCE.getNode(TEST_NODE);
+		IEclipsePreferences preferences = InstanceScope.INSTANCE.getNode(TEST_NODE);
+		try {
+			defaults.put("bold", "false");
+			preferences.put("bold", "false");
+			appendOverriddenPropertyName(preferences, "bold");
+
+			// when
+			preferences.remove("bold");
+
+			// then
+			assertNull(preferences.get("bold", null));
+			assertTrue(getOverriddenPropertyNames(preferences).contains("bold"));
+		} finally {
+			removeOverriddenPropertyNames(preferences);
+			defaults.remove("bold");
+		}
 	}
 }

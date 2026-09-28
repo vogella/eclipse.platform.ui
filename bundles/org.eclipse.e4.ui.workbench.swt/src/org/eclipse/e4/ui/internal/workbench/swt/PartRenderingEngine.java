@@ -1444,10 +1444,12 @@ public class PartRenderingEngine implements IPresentationEngine {
 
 		protected void resetOverriddenPreferences(IEclipsePreferences preferences) {
 			EclipsePreferencesHelper.resetOverriddenDefaults(preferences);
-			for (String name : getOverriddenPropertyNames(preferences)) {
+			List<String> names = getOverriddenPropertyNames(preferences);
+			// detach the listener first, these removals are not user changes
+			removeOverriddenPropertyNames(preferences);
+			for (String name : names) {
 				preferences.remove(name);
 			}
-			removeOverriddenPropertyNames(preferences);
 		}
 
 		protected void removeOverriddenPropertyNames(IEclipsePreferences preferences) {

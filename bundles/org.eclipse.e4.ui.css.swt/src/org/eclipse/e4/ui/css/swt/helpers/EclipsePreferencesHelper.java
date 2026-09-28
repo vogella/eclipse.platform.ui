@@ -114,13 +114,42 @@ public class EclipsePreferencesHelper {
 	IPreferenceChangeListener {
 		@Override
 		public void preferenceChange(PreferenceChangeEvent event) {
-			if (isModified(event) && isRelatedToOverriddenByCss(event)) {
+			if (!isRelatedToOverriddenByCss(event)) {
+				return;
+			}
+			if (isModified(event)) {
 				removeOverriddenByCssProperty(event);
+			} else if (isRemoved(event)) {
+				keepDefaultValue(event);
 			}
 		}
 
 		private boolean isModified(PreferenceChangeEvent event) {
 			return event.getOldValue() != null && event.getNewValue() != null;
+		}
+
+		private boolean isRemoved(PreferenceChangeEvent event) {
+			return event.getOldValue() != null && event.getNewValue() == null;
+		}
+
+		/**
+		 * A preference store removes a value equal to its default. If that default
+		 * differs from the CSS value, store it explicitly, otherwise the CSS value
+		 * is re-applied on the next start.
+		 */
+		protected void keepDefaultValue(PreferenceChangeEvent event) {
+			if (!(event.getNode() instanceof IEclipsePreferences preferences)) {
+				return;
+			}
+			String nodeName = preferences.name();
+			if (nodeName == null || nodeName.isEmpty()) {
+				return;
+			}
+			String defaultValue = DefaultScope.INSTANCE.getNode(nodeName).get(event.getKey(), null);
+			if (defaultValue != null && !defaultValue.equals(event.getOldValue())) {
+				EclipsePreferencesHelper.removeOverriddenByCssProperty(preferences, event.getKey());
+				preferences.put(event.getKey(), defaultValue);
+			}
 		}
 
 		private boolean isRelatedToOverriddenByCss(PreferenceChangeEvent event) {
