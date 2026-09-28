@@ -75,8 +75,10 @@ CTabItem:selected CLabel {
     color: '#org-eclipse-ui-workbench-ACTIVE_NOFOCUS_TAB_SELECTED_TEXT_COLOR';
 }
 
-CTabFolder > Composite#ToolbarComposite {
-  background-color: '#org-eclipse-ui-workbench-ACTIVE_TAB_BG_END'; /* HACK for background of CTabFolder inner Toolbars */
+/* Toolbar separators and empty toolbar space paint the ToolBar's own background */
+CTabFolder > Composite.ToolbarComposite,
+CTabFolder > Composite.ToolbarComposite > ToolBar {
+    background-color: '#org-eclipse-ui-workbench-ACTIVE_UNSELECTED_TABS_COLOR_START';
 }
 
 CTabFolder.MArea CTabItem, 
