@@ -164,9 +164,23 @@ public abstract class FilteredPreferenceDialog extends PreferenceDialog implemen
 			}
 			textChanged();
 		}
+
+		@Override
+		protected void textChanged() {
+			super.textChanged();
+			getDisplay().timerExec((int) getRefreshJobDelay(), highlightSearchMatches);
+		}
+
+		String getSearchText() {
+			return getFilterString();
+		}
 	}
 
 	protected PreferenceFilteredTree filteredTree;
+
+	private final PreferencePageSearchHighlighter searchHighlighter = new PreferencePageSearchHighlighter();
+
+	private final Runnable highlightSearchMatches = this::highlightSearchMatches;
 
 	private Object pageData;
 
@@ -633,8 +647,17 @@ public abstract class FilteredPreferenceDialog extends PreferenceDialog implemen
 		final boolean success = super.showPage(node);
 		if (success) {
 			history.addHistoryEntry(new PreferenceHistoryEntry(node.getId(), node.getLabelText(), null));
+			highlightSearchMatches();
 		}
 		return success;
+	}
+
+	private void highlightSearchMatches() {
+		if (filteredTree == null || filteredTree.isDisposed()) {
+			return;
+		}
+		IPreferencePage page = getCurrentPage();
+		searchHighlighter.highlight(page != null ? page.getControl() : null, filteredTree.getSearchText());
 	}
 
 	@Override

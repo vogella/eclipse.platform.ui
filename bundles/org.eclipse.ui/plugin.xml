@@ -1657,6 +1657,15 @@
          </description>
       </colorDefinition>
       <colorDefinition
+            label="%Color.preferenceSearchHighlight"
+            value="255,230,120"
+            categoryId="org.eclipse.ui.workbenchMisc"
+            id="org.eclipse.ui.workbench.PREFERENCE_SEARCH_HIGHLIGHT">
+         <description>
+            %Color.preferenceSearchHighlightDesc
+         </description>
+      </colorDefinition>
+      <colorDefinition
             label="%Color.activeHyperlinkText"
             categoryId="org.eclipse.ui.workbenchMisc"
             id="ACTIVE_HYPERLINK_COLOR">
